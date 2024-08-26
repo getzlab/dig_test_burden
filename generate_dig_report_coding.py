@@ -45,7 +45,7 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
         :param mut: str, mutation type
         :param bur: str, burden type
         """
-        col_obs = 'OBS' if (bur == 'Total') else 'N_SAMP'
+        col_obs = 'OBS' if (bur == 'BURDEN') else 'N_SAMP'
         cols_lfc = [e + '_' + mut for e in [col_obs, 'EXP']]
         col_pval = 'PVAL_' + mut + '_' + bur
 
@@ -59,7 +59,7 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
         df_kept['LOGFC' + mut + '_' + bur] = np.log2(df_kept[cols_lfc[0]] / df_kept[cols_lfc[1]] + 1)
         df_kept['PVAL' + mut + '_' + bur] = df_kept[col_pval]
         df_kept['FDR' + mut + '_' + bur] = fdrcorrection(df_kept[col_pval])[1]
-        df_kept['dNdS_OBS'] = df_kept['OBS_NONSYN'] / df_kept['OBS_SYN']
+        df_kept['dNdS_OBS'] = df_kept[col_obs + '_NONSYN'] / df_kept['OBS_SYN']
         df_kept['dNdS_EXP'] = df_kept['EXP_NONSYN'] / df_kept['EXP_SYN']
         df_kept = df_kept.sort_values(by='PVAL' + mut + '_' + bur, ignore_index=True)
         df_kept['RANK'] = df_kept.index + 1
@@ -80,20 +80,17 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
             'RANK', 'GENE', 'CHROM', 'GENE_LENGTH',
             'PVAL' + mut + '_' + bur,
             'FDR' + mut + '_' + bur,
-            'OBS_' + mut,
+            col_obs + '_' + mut,
             'EXP_' + mut,
-            'N_SAMP_' + mut,
-            'MU', 'SIGMA', 'dNdS_OBS', 'dNdS_EXP',
-            'FLAG']
+            'MU', 'SIGMA', 'dNdS_OBS', 'dNdS_EXP', 'FLAG']
         n_rows = max(n_rows_min, int(np.sum(ind_sig) * (1 + n_rows_buffer)))
         df_plot = df_kept.iloc[:n_rows][cols_kept].copy()
         df_plot.rename(columns={
             'GENE_LENGTH': 'LENGTH',
             'PVAL' + mut + '_' + bur: 'PVAL',
             'FDR' + mut + '_' + bur: 'FDR',
-            'OBS_' + mut: 'OBS',
-            'EXP_' + mut: 'EXP',
-            'N_SAMP_' + mut: 'N_SAMP',
+            col_obs + '_' + mut: 'OBS',
+            'EXP_' + mut: 'EXP'
         }, inplace=True)
 
         for col in ['PVAL', 'FDR']:
@@ -103,6 +100,7 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
         for col in ['dNdS_EXP', 'EXP']:
             df_plot[col] = reformat_numbers(df_plot[col].to_numpy(), format='{:.3f}')
 
+        df_plot['OBS'] = df_plot['OBS'].astype(int)
         is_inf = np.logical_or(np.isinf(df_plot.dNdS_OBS.to_numpy()), np.isnan(df_plot.dNdS_OBS.to_numpy()))
         df_plot['dNdS_OBS'] = df_plot['dNdS_OBS'].astype(str)
         df_plot.loc[is_inf, 'dNdS_OBS'] = 'NA'
@@ -114,7 +112,7 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
         headerColor = 'grey'
         rowEvenColor = 'lightgrey'
         rowOddColor = 'white'
-        cols_specific = ['PVAL', 'FDR', 'OBS', 'EXP', 'N_SAMP']
+        cols_specific = ['PVAL', 'FDR', 'OBS', 'EXP']
         # Making the significant rows bold
         df_plot = df_plot.astype(str)
         for i in range(df_plot.shape[0]):
@@ -171,11 +169,14 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
             .plot {{
                 margin: 10px;
             }}
+            #dnds-plot {{
+                width: 33%;
+            }}
             #volcano-plot {{
-                width: 47.5%;
+                width: 50%;
             }}
             #qq-plot {{
-                width: 52.5%;
+                width: 50%;
             }}
             #table-plot {{
                 width: 100%;
@@ -185,7 +186,7 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                 justify-content: space-between;
             }}
             .figure-column {{
-                width: 32%;
+                width: 33%;
             }}
         </style>
     </head>
@@ -212,7 +213,7 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
         <div class="figures-container">
             <div class="figure-column">{fig_mu_html}</div>
             <div class="figure-column">{fig_sigma_html}</div>
-            <div class="figure-column">{fig_dnds_html}</div>
+            <div id="dnds-plot" class="plot"></div>
         </div>
     
         <script>
@@ -231,6 +232,10 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                 // Update Q-Q Plot
                 var qqData = data.qq;
                 Plotly.react('qq-plot', qqData);
+                
+                // Update dNdS Plot
+                var dndsData = data.dnds;
+                Plotly.react('dnds-plot', dndsData);
     
                 // Update Table Plot
                 var tableData = data.table;
@@ -257,7 +262,7 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
     for mut_key, mut_val in mut_type.items():
         for bur_key, bur_val in burden_type.items():
             if not (mut_key == 'Indel' and bur_key == 'Sample-wise'):
-                _, pvals, logfc, logq, labels, ind_kept, table_fig = generate_plot_data(mut_val, bur_val)
+                df_kept, pvals, logfc, logq, labels, ind_kept, table_fig = generate_plot_data(mut_val, bur_val)
 
                 volcano_fig = go.Figure()
 
@@ -318,7 +323,8 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                         mode='markers',
                         marker=dict(color='black', opacity=0.5),
                         text=labels[~ind_kept].tolist(),
-                        name='Non-significant'
+                        name='Non-significant',
+                        showlegend=False
                     )
                 )
 
@@ -329,7 +335,8 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                         mode='markers',
                         marker=dict(color='red', opacity=0.7),
                         text=labels[ind_kept].tolist(),
-                        name='Significant'
+                        name='Significant',
+                        showlegend=False
                     )
                 )
 
@@ -351,11 +358,54 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                     yaxis=dict(range=[0, np.max(y) * (1 + hor_buffer)]),
                     template='plotly_white'
                 )
+                # dNdS Plot
+                ind_isna = np.logical_or(df_kept['dNdS_EXP'].isna(), df_kept['dNdS_OBS'].isna())
+                dnds_obs = df_kept['dNdS_OBS'][~ind_isna].to_numpy()
+                dnds_exp = df_kept['dNdS_EXP'][~ind_isna].to_numpy()
+                dnds_labels = df_kept['GENE'][~ind_isna].to_numpy()
+                xmax = np.max(dnds_exp) * (1 + hor_buffer)
+                ind_psel = dnds_obs > dnds_exp
+
+                dnds_fig = go.Figure()
+                dnds_fig.add_trace(
+                    go.Scatter(
+                        x=dnds_exp[~ind_psel].tolist(),
+                        y=dnds_obs[~ind_psel].tolist(),
+                        mode='markers',
+                        marker=dict(color='black', opacity=0.5),
+                        text=dnds_labels[~ind_psel].tolist(),
+                        name='Lower than expected',
+                        showlegend=False
+                    )
+                )
+                dnds_fig.add_trace(
+                    go.Scatter(
+                        x=dnds_exp[ind_psel].tolist(),
+                        y=dnds_obs[ind_psel].tolist(),
+                        mode='markers',
+                        marker=dict(color='red', opacity=0.7),
+                        text=dnds_labels[ind_psel].tolist(),
+                        name='Higher than expected',
+                        showlegend=False
+                    )
+                )
+                dnds_fig.add_trace(
+                    go.Scatter(x=[0, xmax], y=[0, xmax], mode='lines',
+                               line=dict(dash='dash', color='gray'), showlegend=False))
+                dnds_fig.update_layout(
+                    title='Observed vs Expected dNdS ratios:',
+                    xaxis_title='Expected dNdS',
+                    yaxis_title='Observed dNdS',
+                    xaxis=dict(range=[0, xmax]),
+                    yaxis=dict(range=[0, xmax]),
+                    template='plotly_white'
+                )
 
                 # Save figures as separate data
                 plot_data[f"{mut_key}_{bur_key}"] = {
                     'volcano': volcano_fig.to_dict(),
                     'qq': qq_fig.to_dict(),
+                    'dnds': dnds_fig.to_dict(),
                     'table': table_fig.to_dict()
                 }
 
@@ -363,77 +413,61 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
     plot_data_json = json.dumps(plot_data)
 
     # generate static figures for the default values
-    fig_mu = px.histogram(df_kept,
-                          x='MU',
-                          labels={'MU': 'MU'},
-                          opacity=0.8,
-                          log_y=True,
-                          color_discrete_sequence=['gray'])
+    # fig_mu = px.histogram(df_kept,
+    #                       x='MU',
+    #                       labels={'MU': 'MU'},
+    #                       opacity=0.8,
+    #                       log_y=True,
+    #                       color_discrete_sequence=['gray'])
+    # fig_mu.update_layout(
+    #     title='Mean of GP model:',
+    #     xaxis_title='MU (mutations per kilobase)',
+    #     yaxis_title='Number of genes',
+    #     template='plotly_white')
+    #
+    # fig_sigma = px.histogram(df_kept,
+    #                          x='SIGMA',
+    #                          labels={'SIGMA': 'SIGMA'},
+    #                          opacity=0.8,
+    #                          log_y=True,
+    #                          color_discrete_sequence=['gray'])
+    # fig_sigma.update_layout(
+    #     title='Standard deviation of GP model:',
+    #     xaxis_title='SIGMA (mutations per kilobase)',
+    #     yaxis_title='Number of genes',
+    #     template='plotly_white')
+
+    fig_mu = go.Figure(data=[go.Histogram(
+        x=df_kept['MU'],
+        opacity=0.8,
+        marker_color='gray'
+    )])
     fig_mu.update_layout(
         title='Mean of GP model:',
         xaxis_title='MU (mutations per kilobase)',
         yaxis_title='Number of genes',
-        template='plotly_white')
+        template='plotly_white',
+        yaxis_type='log'
+    )
 
-    fig_sigma = px.histogram(df_kept,
-                             x='SIGMA',
-                             labels={'SIGMA': 'SIGMA'},
-                             opacity=0.8,
-                             log_y=True,
-                             color_discrete_sequence=['gray'])
+    fig_sigma = go.Figure(data=[go.Histogram(
+        x=df_kept['SIGMA'],
+        opacity=0.8,
+        marker_color='gray'
+    )])
     fig_sigma.update_layout(
         title='Standard deviation of GP model:',
         xaxis_title='SIGMA (mutations per kilobase)',
         yaxis_title='Number of genes',
-        template='plotly_white')
+        template='plotly_white',
+        yaxis_type='log'
+    )
 
-    # dNdS plot
-    ind_isna = np.logical_or(df_kept['dNdS_EXP'].isna(), df_kept['dNdS_OBS'].isna())
-    dnds_obs = df_kept['dNdS_OBS'][~ind_isna].to_numpy()
-    dnds_exp = df_kept['dNdS_EXP'][~ind_isna].to_numpy()
-    dnds_labels = df_kept['GENE'][~ind_isna].to_numpy()
-    xmax = np.max(dnds_exp) * (1 + hor_buffer)
-    ind_psel = dnds_obs > dnds_exp
 
-    fig_dnds = go.Figure()
-    fig_dnds.add_trace(
-        go.Scatter(
-            x=dnds_exp[~ind_psel].tolist(),
-            y=dnds_obs[~ind_psel].tolist(),
-            mode='markers',
-            marker=dict(color='black', opacity=0.5),
-            text=dnds_labels[~ind_psel].tolist(),
-            name='Lower than expected',
-            showlegend=False
-        )
-    )
-    fig_dnds.add_trace(
-        go.Scatter(
-            x=dnds_exp[ind_psel].tolist(),
-            y=dnds_obs[ind_psel].tolist(),
-            mode='markers',
-            marker=dict(color='red', opacity=0.7),
-            text=dnds_labels[ind_psel].tolist(),
-            name='Higher than expected',
-            showlegend=False
-        )
-    )
-    fig_dnds.add_trace(
-        go.Scatter(x=[0, xmax], y=[0, xmax], mode='lines',
-                   line=dict(dash='dash', color='gray'), showlegend=False))
-    fig_dnds.update_layout(
-        title='Observed vs Expected dNdS ratios:',
-        xaxis_title='Expected dNdS',
-        yaxis_title='Observed dNdS',
-        xaxis=dict(range=[0, xmax]),
-        yaxis=dict(range=[0, xmax]),
-        template='plotly_white'
-    )
 
     # save static figures as HTML divs
     fig_mu_html = fig_mu.to_html(full_html=False, include_plotlyjs='cdn')
     fig_sigma_html = fig_sigma.to_html(full_html=False, include_plotlyjs='cdn')
-    fig_dnds_html = fig_dnds.to_html(full_html=False, include_plotlyjs='cdn')
 
     # combine everything into the final HTML
     html_content = html_content.format(
@@ -441,8 +475,7 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
         burden_options=burden_options,
         plot_data=plot_data_json,
         fig_mu_html=fig_mu_html,
-        fig_sigma_html=fig_sigma_html,
-        fig_dnds_html=fig_dnds_html
+        fig_sigma_html=fig_sigma_html
     )
 
     # save to an HTML file
