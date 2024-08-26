@@ -412,31 +412,7 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
     # convert plot data to JSON-like structure
     plot_data_json = json.dumps(plot_data)
 
-    # generate static figures for the default values
-    # fig_mu = px.histogram(df_kept,
-    #                       x='MU',
-    #                       labels={'MU': 'MU'},
-    #                       opacity=0.8,
-    #                       log_y=True,
-    #                       color_discrete_sequence=['gray'])
-    # fig_mu.update_layout(
-    #     title='Mean of GP model:',
-    #     xaxis_title='MU (mutations per kilobase)',
-    #     yaxis_title='Number of genes',
-    #     template='plotly_white')
-    #
-    # fig_sigma = px.histogram(df_kept,
-    #                          x='SIGMA',
-    #                          labels={'SIGMA': 'SIGMA'},
-    #                          opacity=0.8,
-    #                          log_y=True,
-    #                          color_discrete_sequence=['gray'])
-    # fig_sigma.update_layout(
-    #     title='Standard deviation of GP model:',
-    #     xaxis_title='SIGMA (mutations per kilobase)',
-    #     yaxis_title='Number of genes',
-    #     template='plotly_white')
-
+    # generate histograms for MU and SIGMA
     fig_mu = go.Figure(data=[go.Histogram(
         x=df_kept['MU'],
         opacity=0.8,
@@ -462,8 +438,6 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
         template='plotly_white',
         yaxis_type='log'
     )
-
-
 
     # save static figures as HTML divs
     fig_mu_html = fig_mu.to_html(full_html=False, include_plotlyjs='cdn')
