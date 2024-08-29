@@ -17,6 +17,27 @@ n_rows_buffer = 0.5
 # maximum value along the vertical axis for the volcano and Q-Q plots
 ymax = 16
 
+# properties of significant points
+col_sig = 'red'
+opac_sig = 0.7
+# properties of non-significant points
+col_nonsig = 'black'
+opac_nonsig = 0.5
+# properties of thinner lines
+thk_thin = 0.75
+col_thin = 'gray'
+typ_thin = 'dash'
+# properties of thicker lines
+thk_thick = 2.5
+col_thick = 'gray'
+typ_thick = 'dash'
+# properties of error bars
+wid_err = 2
+thk_err = 0.3
+# properties of the bar plot
+col_bar = 'gray'
+opac_bar = 0.8
+
 # dictionaries for the two dropdowns
 burden_type = {
     'Total': 'BURDEN',
@@ -105,17 +126,17 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
     # total indel burden
     df['PVAL_INDEL_BURDEN_recalc'] = nb_pvalue_greater_midp(
         df.OBS_INDEL,
-        df.ALPHA,
+        df.ALPHA_INDEL,
         1 / (df.THETA_INDEL * df.Pi_INDEL + 1)
     )
     df['PVAL_INDEL_BURDEN_lower'] = nb_pvalue_lower(
         df.OBS_INDEL,
-        df.ALPHA,
+        df.ALPHA_INDEL,
         1 / (df.THETA_INDEL * df.Pi_INDEL + 1)
     )
     df['PVAL_INDEL_BURDEN_upper'] = nb_pvalue_upper(
         df.OBS_INDEL,
-        df.ALPHA,
+        df.ALPHA_INDEL,
         1 / (df.THETA_INDEL * df.Pi_INDEL + 1)
     )
 
@@ -360,16 +381,16 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                             symmetric=False,
                             array=np.round(logq_upper[~ind_kept], 3).tolist(),
                             arrayminus=np.round(logq_lower[~ind_kept], 3).tolist(),
-                            thickness=0.3,
-                            width=2
+                            thickness=thk_err,
+                            width=wid_err
                         ),
                         mode='markers',
-                        marker=dict(color='black', opacity=0.5),
+                        marker=dict(color=col_nonsig, opacity=opac_nonsig),
                         text=labels[~ind_kept].tolist(),
                         name='Non-significant',
                         showlegend=False,
                         xhoverformat='.3f',
-                        yhoverformat='.3f',
+                        yhoverformat='.3f'
                     )
                 )
 
@@ -384,11 +405,11 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                             symmetric=False,
                             array=np.round(logq_upper[ind_ncapped], 3).tolist(),
                             arrayminus=np.round(logq_lower[ind_ncapped], 3).tolist(),
-                            thickness=0.3,
-                            width=2
+                            thickness=thk_err,
+                            width=wid_err
                         ),
                         mode='markers',
-                        marker=dict(color='red', opacity=0.7),
+                        marker=dict(color=col_sig, opacity=opac_sig),
                         text=labels[ind_ncapped].tolist(),
                         name='Significant',
                         showlegend=False,
@@ -409,7 +430,7 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                         x=logfc[ind_capped].tolist(),
                         y=[ymax] * sum(ind_capped),
                         mode='markers',
-                        marker=dict(color='red', opacity=0.7),
+                        marker=dict(color=col_sig, opacity=opac_sig),
                         text=labels_capped,
                         name='Significant',
                         showlegend=False,
@@ -417,19 +438,20 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                     )
                 )
 
+                ylim_upper = min(np.max(logq_upper + logq), ymax) * (1 + hor_buffer)
                 volcano_fig.add_trace(
-                    go.Scatter(x=[1, 1], y=[0, np.max(logq) * (1 + hor_buffer)], mode='lines',
-                               line=dict(dash='dash', color='gray', width=0.75), showlegend=False)
+                    go.Scatter(x=[1, 1], y=[0, ylim_upper], mode='lines',
+                               line=dict(dash=typ_thin, color=col_thin, width=thk_thin), showlegend=False)
                 )
                 volcano_fig.add_trace(
                     go.Scatter(x=[0, np.max(logfc) * (1 + hor_buffer)], y=[-np.log10(alp), -np.log10(alp)],
                                mode='lines',
-                               line=dict(dash='dash', color='gray', width=2.5), showlegend=False)
+                               line=dict(dash=typ_thick, color=col_thick, width=thk_thick), showlegend=False)
                 )
                 volcano_fig.add_trace(
                     go.Scatter(x=[0, np.max(logfc) * (1 + hor_buffer)], y=[ymax] * 2,
                                mode='lines',
-                               line=dict(dash='dash', color='gray', width=0.75), showlegend=False)
+                               line=dict(dash=typ_thin, color=col_thin, width=thk_thin), showlegend=False)
                 )
 
                 volcano_fig.update_layout(
@@ -437,7 +459,7 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                     xaxis_title='Log2(Observed/Expected + 1)',
                     yaxis_title='-Log10(FDR)',
                     xaxis=dict(range=[0, np.max(logfc) * (1 + hor_buffer)]),
-                    yaxis=dict(range=[0, min(np.max(logq), ymax) * (1 + hor_buffer)]),
+                    yaxis=dict(range=[0, ylim_upper]),
                     template='plotly_white'
                 )
 
@@ -459,11 +481,11 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                             symmetric=False,
                             array=np.round(y_upper[~ind_kept], 3).tolist(),
                             arrayminus=np.round(y_lower[~ind_kept], 3).tolist(),
-                            thickness=0.3,
-                            width=2
+                            thickness=thk_err,
+                            width=wid_err
                         ),
                         mode='markers',
-                        marker=dict(color='black', opacity=0.5),
+                        marker=dict(color=col_nonsig, opacity=opac_nonsig),
                         text=labels[~ind_kept].tolist(),
                         name='Non-significant',
                         showlegend=False,
@@ -483,11 +505,11 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                             symmetric=False,
                             array=np.round(y_upper[ind_ncapped], 3).tolist(),
                             arrayminus=np.round(y_lower[ind_ncapped], 3).tolist(),
-                            thickness=0.3,
-                            width=2
+                            thickness=thk_err,
+                            width=wid_err
                         ),
                         mode='markers',
-                        marker=dict(color='red', opacity=0.7),
+                        marker=dict(color=col_sig, opacity=opac_sig),
                         text=labels[ind_ncapped].tolist(),
                         name='Significant',
                         showlegend=False,
@@ -508,7 +530,7 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                         x=x_capped,
                         y=[ymax] * sum(ind_capped),
                         mode='markers',
-                        marker=dict(color='red', opacity=0.7),
+                        marker=dict(color=col_sig, opacity=opac_sig),
                         text=labels_capped,
                         name='Significant',
                         showlegend=False,
@@ -521,7 +543,7 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                         x=[0, np.max(x) * (1 + hor_buffer)],
                         y=[0, np.max(x) * (1 + hor_buffer)],
                         mode='lines',
-                        line=dict(dash='dash', color='gray', width=2.5),
+                        line=dict(dash=typ_thick, color=col_thick, width=thk_thick),
                         showlegend=False
                     )
                 )
@@ -529,15 +551,16 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                 qq_fig.add_trace(
                     go.Scatter(x=[0, np.max(x) * (1 + hor_buffer)], y=[ymax] * 2,
                                mode='lines',
-                               line=dict(dash='dash', color='gray', width=0.75), showlegend=False)
+                               line=dict(dash=typ_thin, color=col_thin, width=thk_thin), showlegend=False)
                 )
 
+                ylim_upper = min(np.max(y_upper + y), ymax) * (1 + hor_buffer)
                 qq_fig.update_layout(
                     title='QQ-Plot of P-values:',
                     xaxis_title='Expected -Log10(P-value)',
                     yaxis_title='Observed -Log10(P-value)',
                     xaxis=dict(range=[0, np.max(x) * (1 + hor_buffer)]),
-                    yaxis=dict(range=[0, min(np.max(y), ymax) * (1 + hor_buffer)]),
+                    yaxis=dict(range=[0, ylim_upper]),
                     template='plotly_white'
                 )
                 # dNdS Plot
@@ -554,7 +577,7 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                         x=dnds_exp[~ind_psel].tolist(),
                         y=dnds_obs[~ind_psel].tolist(),
                         mode='markers',
-                        marker=dict(color='black', opacity=0.5),
+                        marker=dict(color=col_nonsig, opacity=opac_nonsig),
                         text=dnds_labels[~ind_psel].tolist(),
                         name='Lower than expected',
                         showlegend=False
@@ -565,7 +588,7 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                         x=dnds_exp[ind_psel].tolist(),
                         y=dnds_obs[ind_psel].tolist(),
                         mode='markers',
-                        marker=dict(color='red', opacity=0.7),
+                        marker=dict(color=col_sig, opacity=opac_sig),
                         text=dnds_labels[ind_psel].tolist(),
                         name='Higher than expected',
                         showlegend=False
@@ -597,8 +620,8 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
     # generate histograms for MU and SIGMA
     fig_mu = go.Figure(data=[go.Histogram(
         x=df_kept['MU'],
-        opacity=0.8,
-        marker_color='gray'
+        opacity=opac_bar,
+        marker_color=col_bar
     )])
     fig_mu.update_layout(
         title='Mean of GP model:',
@@ -610,8 +633,8 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
 
     fig_sigma = go.Figure(data=[go.Histogram(
         x=df_kept['SIGMA'],
-        opacity=0.8,
-        marker_color='gray'
+        opacity=opac_bar,
+        marker_color=col_bar
     )])
     fig_sigma.update_layout(
         title='Standard deviation of GP model:',

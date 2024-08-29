@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 import numpy as np
+import scipy as sp
 from statsmodels.stats.multitest import fdrcorrection
 import json
 
@@ -14,6 +15,29 @@ n_rows_min = 50
 hor_buffer = 0.05
 # buffer for the number of rows in the table
 n_rows_buffer = 0.5
+# maximum value along the vertical axis for the volcano and Q-Q plots
+ymax = 16
+
+# properties of significant points
+col_sig = 'red'
+opac_sig = 0.7
+# properties of non-significant points
+col_nonsig = 'black'
+opac_nonsig = 0.5
+# properties of thinner lines
+thk_thin = 0.75
+col_thin = 'gray'
+typ_thin = 'dash'
+# properties of thicker lines
+thk_thick = 2.5
+col_thick = 'gray'
+typ_thick = 'dash'
+# properties of error bars
+wid_err = 2
+thk_err = 0.3
+# properties of the bar plot
+col_bar = 'gray'
+opac_bar = 0.8
 
 burden_type = {
     'Total': 'BURDEN',
@@ -25,6 +49,29 @@ mut_type = {
 }
 
 
+def nb_pvalue_greater_midp(k, alpha, p):
+    """ Calculate an UPPER TAIL p-value for a negative binomial distribution
+        with a midp correction
+    """
+    return 0.5 * sp.stats.nbinom.pmf(k, alpha, p) + sp.special.betainc(k+1, alpha, 1-p)
+
+
+def nb_pvalue_lower(k, alpha, p):
+    """ Calculate the upper bound for the p-value of a negative binomial distribution.
+    """
+    return sp.special.betainc(k+1, alpha, 1-p)
+
+
+def nb_pvalue_upper(k, alpha, p):
+    """ Calculate the upper bound for the p-value of a negative binomial distribution.
+    """
+    ind_0 = k == 0
+    pvals = np.zeros_like(alpha)
+    pvals[ind_0] = sp.stats.nbinom.pmf(k[ind_0], alpha[ind_0], p[ind_0])
+    pvals[~ind_0] = sp.special.betainc(k[~ind_0], alpha[~ind_0], 1-p[~ind_0])
+    return pvals
+
+
 def reformat_numbers(x, format='{:.3E}'):
     """
     Reformat numbers in an array to a specific format
@@ -33,6 +80,31 @@ def reformat_numbers(x, format='{:.3E}'):
 
 
 def generate_dig_report(path_to_dig_results, dir_output, name_interval_set, prefix_output=None, alp=0.1):
+    # Output from DIGDriver
+    df = pd.read_csv(path_to_dig_results, sep='\t')
+    # Computing lower and upper bounds for the p-values
+    pfxs_obs = ['SNV', 'INDEL', 'SAMPLES']
+    pfxs_pval = ['SNV', 'INDEL', 'SAMPLE']
+    pfxs_pi = ['SUM', 'INDEL', 'SUM']
+    pfxs_at = ['', '_INDEL', '']
+
+    for i in range(len(pfxs_obs)):
+        df['PVAL_' + pfxs_pval[i] + '_BURDEN_recalc'] = nb_pvalue_greater_midp(
+            df['OBS_' + pfxs_obs[i]],
+            df['ALPHA' + pfxs_at[i]],
+            1 / (df['THETA' + pfxs_at[i]] * df['Pi_' + pfxs_pi[i]] + 1)
+        )
+        df['PVAL_' + pfxs_pval[i] + '_BURDEN_lower'] = nb_pvalue_lower(
+            df['OBS_' + pfxs_obs[i]],
+            df['ALPHA' + pfxs_at[i]],
+            1 / (df['THETA' + pfxs_at[i]] * df['Pi_' + pfxs_pi[i]] + 1)
+        )
+        df['PVAL_' + pfxs_pval[i] + '_BURDEN_upper'] = nb_pvalue_upper(
+            df['OBS_' + pfxs_obs[i]],
+            df['ALPHA' + pfxs_at[i]],
+            1 / (df['THETA' + pfxs_at[i]] * df['Pi_' + pfxs_pi[i]] + 1)
+        )
+
     def generate_plot_data(mut, bur):
         """
         Given a mutation type and a burden type, generate the data for the volcano plot, Q-Q plot, and table plot
@@ -43,8 +115,6 @@ def generate_dig_report(path_to_dig_results, dir_output, name_interval_set, pref
         col_exp = 'EXP_' + mut
         col_pval = 'PVAL_' + (mut + '_' if bur == 'BURDEN' else '') + bur
 
-        # Output from DIGDriver
-        df = pd.read_csv(path_to_dig_results, sep='\t')
         # Extract gene name and Ensembl ID
         df['GENE'] = df.ELT.str.split('::', expand=True)[2]
         df['ENSEMBL_ID'] = df.ELT.str.split('::', expand=True)[3]
@@ -53,17 +123,22 @@ def generate_dig_report(path_to_dig_results, dir_output, name_interval_set, pref
         ind_keep = df[col_exp] > 0
         df_kept = df.loc[ind_keep].copy()
 
-        df_kept['LOGFC' + mut + '_' + bur] = np.log2(df_kept[col_obs] / df_kept[col_exp] + 1)
-        df_kept['PVAL' + mut + '_' + bur] = df_kept[col_pval]
-        df_kept['FDR' + mut + '_' + bur] = fdrcorrection(df_kept[col_pval])[1]
-        df_kept = df_kept.sort_values(by='PVAL' + mut + '_' + bur, ignore_index=True)
+        df_kept['LOGFC_' + mut + '_' + bur] = np.log2(df_kept[col_obs] / df_kept[col_exp] + 1)
+        df_kept['FDR_' + mut + '_' + bur] = fdrcorrection(df_kept[col_pval])[1]
+        df_kept['FDR_' + mut + '_' + bur + '_recalc'] = fdrcorrection(df_kept[col_pval + '_recalc'])[1]
+        df_kept['FDR_' + mut + '_' + bur + '_lower'] = fdrcorrection(df_kept[col_pval + '_lower'])[1]
+        df_kept['FDR_' + mut + '_' + bur + '_upper'] = fdrcorrection(df_kept[col_pval + '_upper'])[1]
+        df_kept = df_kept.sort_values(by=col_pval, ignore_index=True)
         df_kept['RANK'] = df_kept.index + 1
 
         labels = df_kept.GENE.to_numpy()
-        logfc = df_kept['LOGFC' + mut + '_' + bur].to_numpy()
-        pvals = df_kept['PVAL' + mut + '_' + bur].to_numpy()
-        qvals = df_kept['FDR' + mut + '_' + bur].to_numpy()
+        logfc = df_kept['LOGFC_' + mut + '_' + bur].to_numpy()
+        pvals = df_kept[col_pval + '_recalc'].to_numpy()
+        pval_bounds = df_kept[[col_pval + '_lower', col_pval + '_upper']].to_numpy()
+        qvals = df_kept['FDR_' + mut + '_' + bur + '_recalc'].to_numpy()
         logq = -np.log10(qvals)
+        logq_bounds = -np.log10(
+        df_kept[['FDR_' + mut + '_' + bur + '_lower', 'FDR_' + mut + '_' + bur + '_upper']].to_numpy())
 
         # Determine significant points
         ind_sig = qvals < alp
@@ -73,8 +148,8 @@ def generate_dig_report(path_to_dig_results, dir_output, name_interval_set, pref
         # Dataframe for the plot
         cols_kept = [
             'RANK', 'GENE', 'ELT_SIZE',
-            'PVAL' + mut + '_' + bur,
-            'FDR' + mut + '_' + bur,
+            col_pval,
+            'FDR_' + mut + '_' + bur,
             col_obs,
             col_exp,
             'MU', 'SIGMA',
@@ -83,8 +158,8 @@ def generate_dig_report(path_to_dig_results, dir_output, name_interval_set, pref
         df_plot = df_kept.iloc[:n_rows][cols_kept].copy()
         df_plot.rename(columns={
             'ELT_SIZE': 'SIZE',
-            'PVAL' + mut + '_' + bur: 'PVAL',
-            'FDR' + mut + '_' + bur: 'FDR',
+            col_pval: 'PVAL',
+            'FDR_' + mut + '_' + bur: 'FDR',
             col_obs: 'OBS',
             col_exp: 'EXP'
         }, inplace=True)
@@ -140,10 +215,10 @@ def generate_dig_report(path_to_dig_results, dir_output, name_interval_set, pref
             ]
         )
 
-        return df_kept, pvals, logfc, logq, labels, ind_kept, table_fig
+        return df_kept, pvals, pval_bounds, logfc, logq, logq_bounds, labels, ind_kept, table_fig
 
     # generate the data and table for the default values
-    df_kept, pvals, logfc, logq, labels, ind_kept, table_fig = generate_plot_data('SNV', 'BURDEN')
+    df_kept, pvals, pval_bounds, logfc, logq, logq_bounds, labels, ind_kept, table_fig = generate_plot_data('SNV', 'BURDEN')
 
     # Update the HTML template to include the additional text below the table
     html_content = """
@@ -162,10 +237,10 @@ def generate_dig_report(path_to_dig_results, dir_output, name_interval_set, pref
                 margin: 10px;
             }}
             #volcano-plot {{
-                width: 47.5%;
+                width: 50%;
             }}
             #qq-plot {{
-                width: 52.5%;
+                width: 50%;
             }}
             #table-plot {{
                 width: 100%;
@@ -246,37 +321,85 @@ def generate_dig_report(path_to_dig_results, dir_output, name_interval_set, pref
     for mut_key, mut_val in mut_type.items():
         for bur_key, bur_val in burden_type.items():
             if not (mut_key == 'Indel' and bur_key == 'Sample-wise'):
-                _, pvals, logfc, logq, labels, ind_kept, table_fig = generate_plot_data(mut_val, bur_val)
-
-                volcano_fig = go.Figure()
+                _, pvals, pval_bounds, logfc, logq, logq_bounds, labels, ind_kept, table_fig = generate_plot_data(mut_val, bur_val)
 
                 # Volcano Plot
+                logq_upper = logq_bounds[:, 0] - logq
+                logq_lower = logq - logq_bounds[:, 1]
+                ind_capped = logq > ymax
+
+                volcano_fig = go.Figure()
                 volcano_fig.add_trace(
                     go.Scatter(
                         x=logfc[~ind_kept].tolist(),
                         y=logq[~ind_kept].tolist(),
+                        error_y=dict(
+                            type='data',
+                            symmetric=False,
+                            array=np.round(logq_upper[~ind_kept], 3).tolist(),
+                            arrayminus=np.round(logq_lower[~ind_kept], 3).tolist(),
+                            thickness=thk_err,
+                            width=wid_err
+                        ),
                         mode='markers',
                         marker=dict(color='black', opacity=0.5),
                         text=labels[~ind_kept].tolist(),
                         name='Non-significant',
-                        showlegend=False
+                        showlegend=False,
+                        xhoverformat='.3f',
+                        yhoverformat='.3f'
                     )
                 )
+
+                ind_ncapped = np.logical_and(ind_kept, ~ind_capped)
 
                 volcano_fig.add_trace(
                     go.Scatter(
-                        x=logfc[ind_kept].tolist(),
-                        y=logq[ind_kept].tolist(),
+                        x=logfc[ind_ncapped].tolist(),
+                        y=logq[ind_ncapped].tolist(),
+                        error_y=dict(
+                            type='data',
+                            symmetric=False,
+                            array=np.round(logq_upper[ind_ncapped], 3).tolist(),
+                            arrayminus=np.round(logq_lower[ind_ncapped], 3).tolist(),
+                            thickness=thk_err,
+                            width=wid_err
+                        ),
                         mode='markers',
-                        marker=dict(color='red', opacity=0.7),
-                        text=labels[ind_kept].tolist(),
+                        marker=dict(color=col_sig, opacity=opac_sig),
+                        text=labels[ind_ncapped].tolist(),
                         name='Significant',
-                        showlegend=False
+                        showlegend=False,
+                        xhoverformat='.3f',
+                        yhoverformat='.3f'
                     )
                 )
 
+                labels_capped = labels[ind_capped].tolist()
+                logfc_capped = logfc[ind_capped].tolist()
+                logq_capped = logq[ind_capped].tolist()
+                logq_upper_capped = logq_upper[ind_capped].tolist()
+                logq_lower_capped = logq_lower[ind_capped].tolist()
+                labels_capped = [(
+                                     f"({logfc_capped[i]:.3f}, {logq_capped[i]:.3f} +{logq_upper_capped[i]:.3f} / -{logq_lower_capped[i]:.3f})<br>{l}")
+                                 for i, l in enumerate(labels_capped)]
+
                 volcano_fig.add_trace(
-                    go.Scatter(x=[1, 1], y=[0, np.max(logq) * (1 + hor_buffer)], mode='lines',
+                    go.Scatter(
+                        x=logfc[ind_capped].tolist(),
+                        y=[ymax] * sum(ind_capped),
+                        mode='markers',
+                        marker=dict(color=col_sig, opacity=opac_sig),
+                        text=labels_capped,
+                        name='Significant',
+                        showlegend=False,
+                        hoverinfo='name+text',
+                    )
+                )
+
+                ylim_upper = min(np.max(logq_upper + logq), ymax) * (1 + hor_buffer)
+                volcano_fig.add_trace(
+                    go.Scatter(x=[1, 1], y=[0, ylim_upper], mode='lines',
                                line=dict(dash='dash', color='gray'), showlegend=False)
                 )
                 volcano_fig.add_trace(
@@ -284,19 +407,27 @@ def generate_dig_report(path_to_dig_results, dir_output, name_interval_set, pref
                                mode='lines',
                                line=dict(dash='dash', color='gray'), showlegend=False)
                 )
+                volcano_fig.add_trace(
+                    go.Scatter(x=[0, np.max(logfc) * (1 + hor_buffer)], y=[ymax] * 2,
+                               mode='lines',
+                               line=dict(dash=typ_thin, color=col_thin, width=thk_thin), showlegend=False)
+                )
 
                 volcano_fig.update_layout(
                     title='Observed/Expected counts vs. False Discovery Rate:',
                     xaxis_title='Log2(Observed/Expected + 1)',
                     yaxis_title='-Log10(FDR)',
                     xaxis=dict(range=[0, np.max(logfc) * (1 + hor_buffer)]),
-                    yaxis=dict(range=[0, np.max(logq) * (1 + hor_buffer)]),
+                    yaxis=dict(range=[0, ylim_upper]),
                     template='plotly_white'
                 )
 
                 # Q-Q Plot
                 x = -np.log10(np.arange(1, len(pvals) + 1) / (len(pvals) + 1))
                 y = -np.log10(pvals)
+                y_upper = -np.log10(pval_bounds[:, 0]) - y
+                y_lower = y + np.log10(pval_bounds[:, 1])
+                ind_capped = y > ymax
 
                 qq_fig = go.Figure()
 
@@ -304,40 +435,93 @@ def generate_dig_report(path_to_dig_results, dir_output, name_interval_set, pref
                     go.Scatter(
                         x=x[~ind_kept].tolist(),
                         y=y[~ind_kept].tolist(),
+                        error_y=dict(
+                            type='data',
+                            symmetric=False,
+                            array=np.round(y_upper[~ind_kept], 3).tolist(),
+                            arrayminus=np.round(y_lower[~ind_kept], 3).tolist(),
+                            thickness=thk_err,
+                            width=wid_err
+                        ),
                         mode='markers',
-                        marker=dict(color='black', opacity=0.5),
+                        marker=dict(color=col_nonsig, opacity=opac_nonsig),
                         text=labels[~ind_kept].tolist(),
-                        name='Non-significant'
+                        name='Non-significant',
+                        showlegend=False,
+                        xhoverformat='.3f',
+                        yhoverformat='.3f'
                     )
                 )
 
+                ind_ncapped = np.logical_and(ind_kept, ~ind_capped)
+
                 qq_fig.add_trace(
                     go.Scatter(
-                        x=x[ind_kept].tolist(),
-                        y=y[ind_kept].tolist(),
+                        x=x[ind_ncapped].tolist(),
+                        y=y[ind_ncapped].tolist(),
+                        error_y=dict(
+                            type='data',
+                            symmetric=False,
+                            array=np.round(y_upper[ind_ncapped], 3).tolist(),
+                            arrayminus=np.round(y_lower[ind_ncapped], 3).tolist(),
+                            thickness=thk_err,
+                            width=wid_err
+                        ),
                         mode='markers',
-                        marker=dict(color='red', opacity=0.7),
-                        text=labels[ind_kept].tolist(),
-                        name='Significant'
+                        marker=dict(color=col_sig, opacity=opac_sig),
+                        text=labels[ind_ncapped].tolist(),
+                        name='Significant',
+                        showlegend=False,
+                        xhoverformat='.3f',
+                        yhoverformat='.3f'
+                    )
+                )
+
+                labels_capped = labels[ind_capped].tolist()
+                x_capped = x[ind_capped].tolist()
+                y_capped = y[ind_capped].tolist()
+                y_upper_capped = y_upper[ind_capped].tolist()
+                y_lower_capped = y_lower[ind_capped].tolist()
+                labels_capped = [(
+                                     f"({x_capped[i]:.3f}, {y_capped[i]:.3f} +{y_upper_capped[i]:.3f} / -{y_lower_capped[i]:.3f})<br>{l}")
+                                 for i, l in enumerate(labels_capped)]
+
+                qq_fig.add_trace(
+                    go.Scatter(
+                        x=x_capped,
+                        y=[ymax] * sum(ind_capped),
+                        mode='markers',
+                        marker=dict(color=col_sig, opacity=opac_sig),
+                        text=labels_capped,
+                        name='Significant',
+                        showlegend=False,
+                        hoverinfo='name+text',
                     )
                 )
 
                 qq_fig.add_trace(
                     go.Scatter(
-                        x=[0, max(x)],
-                        y=[0, max(x)],
+                        x=[0, np.max(x) * (1 + hor_buffer)],
+                        y=[0, np.max(x) * (1 + hor_buffer)],
                         mode='lines',
-                        line=dict(dash='dash', color='gray'),
+                        line=dict(dash=typ_thick, color=col_thick, width=thk_thick),
                         showlegend=False
                     )
                 )
 
+                qq_fig.add_trace(
+                    go.Scatter(x=[0, np.max(x) * (1 + hor_buffer)], y=[ymax] * 2,
+                               mode='lines',
+                               line=dict(dash=typ_thin, color=col_thin, width=thk_thin), showlegend=False)
+                )
+
+                ylim_upper = min(np.max(y_upper + y), ymax) * (1 + hor_buffer)
                 qq_fig.update_layout(
                     title='QQ-Plot of P-values:',
                     xaxis_title='Expected -Log10(P-value)',
                     yaxis_title='Observed -Log10(P-value)',
                     xaxis=dict(range=[0, np.max(x) * (1 + hor_buffer)]),
-                    yaxis=dict(range=[0, np.max(y) * (1 + hor_buffer)]),
+                    yaxis=dict(range=[0, ylim_upper]),
                     template='plotly_white'
                 )
 
