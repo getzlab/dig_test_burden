@@ -596,7 +596,7 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                 )
                 dnds_fig.add_trace(
                     go.Scatter(x=[0, xmax], y=[0, xmax], mode='lines',
-                               line=dict(dash='dash', color='gray'), showlegend=False))
+                               line=dict(dash=typ_thick, color=col_thick, width=thk_thick), showlegend=False))
                 dnds_fig.update_layout(
                     title='Observed vs Expected dNdS ratios:',
                     xaxis_title='Expected dNdS',

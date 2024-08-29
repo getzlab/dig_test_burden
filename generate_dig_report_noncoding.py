@@ -342,7 +342,7 @@ def generate_dig_report(path_to_dig_results, dir_output, name_interval_set, pref
                             width=wid_err
                         ),
                         mode='markers',
-                        marker=dict(color='black', opacity=0.5),
+                        marker=dict(color=col_nonsig, opacity=opac_nonsig),
                         text=labels[~ind_kept].tolist(),
                         name='Non-significant',
                         showlegend=False,
@@ -400,12 +400,12 @@ def generate_dig_report(path_to_dig_results, dir_output, name_interval_set, pref
                 ylim_upper = min(np.max(logq_upper + logq), ymax) * (1 + hor_buffer)
                 volcano_fig.add_trace(
                     go.Scatter(x=[1, 1], y=[0, ylim_upper], mode='lines',
-                               line=dict(dash='dash', color='gray'), showlegend=False)
+                               line=dict(dash=typ_thin, color=col_thin, width=thk_thin), showlegend=False)
                 )
                 volcano_fig.add_trace(
                     go.Scatter(x=[0, np.max(logfc) * (1 + hor_buffer)], y=[-np.log10(alp), -np.log10(alp)],
                                mode='lines',
-                               line=dict(dash='dash', color='gray'), showlegend=False)
+                               line=dict(dash=typ_thick, color=col_thick, width=thk_thick), showlegend=False)
                 )
                 volcano_fig.add_trace(
                     go.Scatter(x=[0, np.max(logfc) * (1 + hor_buffer)], y=[ymax] * 2,
@@ -539,9 +539,9 @@ def generate_dig_report(path_to_dig_results, dir_output, name_interval_set, pref
     fig_mu = px.histogram(df_kept,
                           x='MU',
                           labels={'MU': 'MU'},
-                          opacity=0.8,
+                          opacity=opac_bar,
                           log_y=True,
-                          color_discrete_sequence=['gray'])
+                          color_discrete_sequence=[col_bar])
     fig_mu.update_layout(
         title='Mean of GP model:',
         xaxis_title='MU (mutations per kilobase)',
@@ -551,9 +551,9 @@ def generate_dig_report(path_to_dig_results, dir_output, name_interval_set, pref
     fig_sigma = px.histogram(df_kept,
                              x='SIGMA',
                              labels={'SIGMA': 'SIGMA'},
-                             opacity=0.8,
+                             opacity=opac_bar,
                              log_y=True,
-                             color_discrete_sequence=['gray'])
+                             color_discrete_sequence=[col_bar])
     fig_sigma.update_layout(
         title='Standard deviation of GP model:',
         xaxis_title='SIGMA (mutations per kilobase)',
