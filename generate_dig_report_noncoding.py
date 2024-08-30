@@ -324,6 +324,8 @@ def generate_dig_report(path_to_dig_results, dir_output, name_interval_set, pref
                 _, pvals, pval_bounds, logfc, logq, logq_bounds, labels, ind_kept, table_fig = generate_plot_data(mut_val, bur_val)
 
                 # Volcano Plot
+
+                # Scatter plots
                 logq_upper = logq_bounds[:, 0] - logq
                 logq_lower = logq - logq_bounds[:, 1]
                 ind_capped = logq > ymax
@@ -397,22 +399,41 @@ def generate_dig_report(path_to_dig_results, dir_output, name_interval_set, pref
                     )
                 )
 
+                # Line plots
                 ylim_upper = min(np.max(logq_upper + logq), ymax) * (1 + hor_buffer)
                 volcano_fig.add_trace(
-                    go.Scatter(x=[1, 1], y=[0, ylim_upper], mode='lines',
-                               line=dict(dash=typ_thin, color=col_thin, width=thk_thin), showlegend=False)
+                    go.Scatter(
+                        x=[1, 1],
+                        y=[0, ylim_upper],
+                        mode='lines',
+                        line=dict(dash=typ_thin, color=col_thin, width=thk_thin),
+                        showlegend=False,
+                        hoverinfo='skip'
+                    )
                 )
                 volcano_fig.add_trace(
-                    go.Scatter(x=[0, np.max(logfc) * (1 + hor_buffer)], y=[-np.log10(alp), -np.log10(alp)],
-                               mode='lines',
-                               line=dict(dash=typ_thick, color=col_thick, width=thk_thick), showlegend=False)
+                    go.Scatter(
+                        x=[0, np.max(logfc) * (1 + hor_buffer)],
+                        y=[-np.log10(alp), -np.log10(alp)],
+                        mode='lines',
+                        line=dict(dash=typ_thick, color=col_thick, width=thk_thick),
+                        showlegend=False,
+                        hoverinfo='skip'
+                    )
                 )
-                volcano_fig.add_trace(
-                    go.Scatter(x=[0, np.max(logfc) * (1 + hor_buffer)], y=[ymax] * 2,
-                               mode='lines',
-                               line=dict(dash=typ_thin, color=col_thin, width=thk_thin), showlegend=False)
-                )
+                if ymax < ylim_upper:
+                    volcano_fig.add_trace(
+                        go.Scatter(
+                            x=[0, np.max(logfc) * (1 + hor_buffer)],
+                            y=[ymax] * 2,
+                            mode='lines',
+                            line=dict(dash=typ_thin, color=col_thin, width=thk_thin),
+                            showlegend=False,
+                            hoverinfo='skip'
+                        )
+                    )
 
+                # Formatting the figure
                 volcano_fig.update_layout(
                     title='Observed/Expected counts vs. False Discovery Rate:',
                     xaxis_title='Log2(Observed/Expected + 1)',
@@ -423,6 +444,8 @@ def generate_dig_report(path_to_dig_results, dir_output, name_interval_set, pref
                 )
 
                 # Q-Q Plot
+
+                # Scatter plots
                 x = -np.log10(np.arange(1, len(pvals) + 1) / (len(pvals) + 1))
                 y = -np.log10(pvals)
                 y_upper = -np.log10(pval_bounds[:, 0]) - y
@@ -430,7 +453,6 @@ def generate_dig_report(path_to_dig_results, dir_output, name_interval_set, pref
                 ind_capped = y > ymax
 
                 qq_fig = go.Figure()
-
                 qq_fig.add_trace(
                     go.Scatter(
                         x=x[~ind_kept].tolist(),
@@ -499,23 +521,31 @@ def generate_dig_report(path_to_dig_results, dir_output, name_interval_set, pref
                     )
                 )
 
+                # Line plots
+                ylim_upper = min(np.max(y_upper + y), ymax) * (1 + hor_buffer)
                 qq_fig.add_trace(
                     go.Scatter(
                         x=[0, np.max(x) * (1 + hor_buffer)],
                         y=[0, np.max(x) * (1 + hor_buffer)],
                         mode='lines',
                         line=dict(dash=typ_thick, color=col_thick, width=thk_thick),
-                        showlegend=False
+                        showlegend=False,
+                        hoverinfo='skip'
                     )
                 )
+                if ymax < ylim_upper:
+                    qq_fig.add_trace(
+                        go.Scatter(
+                            x=[0, np.max(x) * (1 + hor_buffer)],
+                            y=[ymax] * 2,
+                            mode='lines',
+                            line=dict(dash=typ_thin, color=col_thin, width=thk_thin),
+                            showlegend=False,
+                            hoverinfo='skip'
+                        )
+                    )
 
-                qq_fig.add_trace(
-                    go.Scatter(x=[0, np.max(x) * (1 + hor_buffer)], y=[ymax] * 2,
-                               mode='lines',
-                               line=dict(dash=typ_thin, color=col_thin, width=thk_thin), showlegend=False)
-                )
-
-                ylim_upper = min(np.max(y_upper + y), ymax) * (1 + hor_buffer)
+                # Formatting the figure
                 qq_fig.update_layout(
                     title='QQ-Plot of P-values:',
                     xaxis_title='Expected -Log10(P-value)',

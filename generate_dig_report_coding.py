@@ -367,10 +367,11 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                 df_kept, pvals, pval_bounds, logfc, logq, logq_bounds, labels, ind_kept, table_fig = generate_plot_data(mut_val, bur_val)
 
                 # Volcano Plot
+
+                # Scatter plots
                 logq_upper = logq_bounds[:, 0] - logq
                 logq_lower = logq - logq_bounds[:, 1]
                 ind_capped = logq > ymax
-
                 volcano_fig = go.Figure()
                 volcano_fig.add_trace(
                     go.Scatter(
@@ -438,22 +439,41 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                     )
                 )
 
+                # Line plots
                 ylim_upper = min(np.max(logq_upper + logq), ymax) * (1 + hor_buffer)
                 volcano_fig.add_trace(
-                    go.Scatter(x=[1, 1], y=[0, ylim_upper], mode='lines',
-                               line=dict(dash=typ_thin, color=col_thin, width=thk_thin), showlegend=False)
+                    go.Scatter(
+                        x=[1, 1],
+                        y=[0, ylim_upper],
+                        mode='lines',
+                        line=dict(dash=typ_thin, color=col_thin, width=thk_thin),
+                        showlegend=False,
+                        hoverinfo='skip'
+                    )
                 )
                 volcano_fig.add_trace(
-                    go.Scatter(x=[0, np.max(logfc) * (1 + hor_buffer)], y=[-np.log10(alp), -np.log10(alp)],
-                               mode='lines',
-                               line=dict(dash=typ_thick, color=col_thick, width=thk_thick), showlegend=False)
+                    go.Scatter(
+                        x=[0, np.max(logfc) * (1 + hor_buffer)],
+                        y=[-np.log10(alp), -np.log10(alp)],
+                        mode='lines',
+                        line=dict(dash=typ_thick, color=col_thick, width=thk_thick),
+                        showlegend=False,
+                        hoverinfo='skip'
+                    )
                 )
-                volcano_fig.add_trace(
-                    go.Scatter(x=[0, np.max(logfc) * (1 + hor_buffer)], y=[ymax] * 2,
-                               mode='lines',
-                               line=dict(dash=typ_thin, color=col_thin, width=thk_thin), showlegend=False)
-                )
+                if ylim_upper > ymax:
+                    volcano_fig.add_trace(
+                        go.Scatter(
+                            x=[0, np.max(logfc) * (1 + hor_buffer)],
+                            y=[ymax] * 2,
+                            mode='lines',
+                            line=dict(dash=typ_thin, color=col_thin, width=thk_thin),
+                            showlegend=False,
+                            hoverinfo='skip'
+                        )
+                    )
 
+                # Figure formatting
                 volcano_fig.update_layout(
                     title='Observed/Expected counts vs. False Discovery Rate:',
                     xaxis_title='Log2(Observed/Expected + 1)',
@@ -464,6 +484,8 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                 )
 
                 # Q-Q Plot
+
+                # Scatter plots
                 x = -np.log10(np.arange(1, len(pvals) + 1) / (len(pvals) + 1))
                 y = -np.log10(pvals)
                 y_upper = -np.log10(pval_bounds[:, 0]) - y
@@ -471,7 +493,6 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                 ind_capped = y > ymax
 
                 qq_fig = go.Figure()
-
                 qq_fig.add_trace(
                     go.Scatter(
                         x=x[~ind_kept].tolist(),
@@ -538,23 +559,31 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                     )
                 )
 
+                # Line plots
+                ylim_upper = min(np.max(y_upper + y), ymax) * (1 + hor_buffer)
                 qq_fig.add_trace(
                     go.Scatter(
                         x=[0, np.max(x) * (1 + hor_buffer)],
                         y=[0, np.max(x) * (1 + hor_buffer)],
                         mode='lines',
                         line=dict(dash=typ_thick, color=col_thick, width=thk_thick),
-                        showlegend=False
+                        showlegend=False,
+                        hoverinfo='skip'
                     )
                 )
+                if ylim_upper > ymax:
+                    qq_fig.add_trace(
+                        go.Scatter(
+                            x=[0, np.max(x) * (1 + hor_buffer)],
+                            y=[ymax] * 2,
+                            mode='lines',
+                            line=dict(dash=typ_thin, color=col_thin, width=thk_thin),
+                            showlegend=False,
+                            hoverinfo='skip'
+                        )
+                    )
 
-                qq_fig.add_trace(
-                    go.Scatter(x=[0, np.max(x) * (1 + hor_buffer)], y=[ymax] * 2,
-                               mode='lines',
-                               line=dict(dash=typ_thin, color=col_thin, width=thk_thin), showlegend=False)
-                )
-
-                ylim_upper = min(np.max(y_upper + y), ymax) * (1 + hor_buffer)
+                # Figure formatting
                 qq_fig.update_layout(
                     title='QQ-Plot of P-values:',
                     xaxis_title='Expected -Log10(P-value)',
@@ -563,14 +592,16 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                     yaxis=dict(range=[0, ylim_upper]),
                     template='plotly_white'
                 )
+
                 # dNdS Plot
+
+                # Scatter plots
                 ind_isna = np.logical_or(df_kept['dNdS_EXP'].isna(), df_kept['dNdS_OBS'].isna())
                 dnds_obs = df_kept['dNdS_OBS'][~ind_isna].to_numpy()
                 dnds_exp = df_kept['dNdS_EXP'][~ind_isna].to_numpy()
                 dnds_labels = df_kept['GENE'][~ind_isna].to_numpy()
                 xmax = np.max(dnds_exp) * (1 + hor_buffer)
                 ind_psel = dnds_obs > dnds_exp
-
                 dnds_fig = go.Figure()
                 dnds_fig.add_trace(
                     go.Scatter(
@@ -594,15 +625,26 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                         showlegend=False
                     )
                 )
+
+                # Line plot
                 dnds_fig.add_trace(
-                    go.Scatter(x=[0, xmax], y=[0, xmax], mode='lines',
-                               line=dict(dash=typ_thick, color=col_thick, width=thk_thick), showlegend=False))
+                    go.Scatter(
+                        x=[0, xmax],
+                        y=[0, xmax],
+                        mode='lines',
+                        line=dict(dash=typ_thick, color=col_thick, width=thk_thick),
+                        showlegend=False,
+                        hoverinfo='skip'
+                    )
+                )
+
+                # Figure formatting
                 dnds_fig.update_layout(
                     title='Observed vs Expected dNdS ratios:',
                     xaxis_title='Expected dNdS',
                     yaxis_title='Observed dNdS',
                     xaxis=dict(range=[0, xmax]),
-                    yaxis=dict(range=[0, xmax]),
+                    yaxis=dict(range=[0, np.max(dnds_obs) * (1 + hor_buffer)]),
                     template='plotly_white'
                 )
 
