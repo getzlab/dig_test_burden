@@ -57,8 +57,10 @@ mut_type = {
     'Splice site SNV': 'SPL',
     'Synonymous SNV': 'SYN',
 }
-
-
+display_bounds_type = {
+    'Yes': True,
+    'No': False
+}
 
 def nb_pvalue_greater_midp(k, alpha, p):
     """ Calculate an UPPER TAIL p-value for a negative binomial distribution with a midp correction
@@ -81,10 +83,12 @@ def nb_pvalue_upper(k, alpha, p):
     pvals[~ind_0] = sp.special.betainc(k[~ind_0], alpha[~ind_0], 1-p[~ind_0])
     return pvals
 
+
 def nb_pvalue_uniform_midp(k, alpha, p):
     """ Calculate the upper tail p-value for negative binomial distribution using uniform approximation and a random draw.
     """
     return np.random.uniform(size=k.shape) * sp.stats.nbinom.pmf(k, alpha, p) + sp.special.betainc(k+1, alpha, 1-p)
+
 
 def reformat_numbers(x, format='{:.3E}'):
     """
@@ -149,11 +153,12 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
         1 / (df.THETA_INDEL * df.Pi_INDEL + 1)
     )
 
-    def generate_plot_data(mut, bur):
+    def generate_plot_data(mut, bur, display_bounds):
         """
         Given a mutation type and a burden type, generate the data for the volcano plot, Q-Q plot, and table plot
         :param mut: str, mutation type
         :param bur: str, burden type
+        :param display_bounds: bool, whether to display the bounds of the p-values
         """
         col_obs = 'OBS' if (bur == 'BURDEN') else 'N_SAMP'
         cols_lfc = [e + '_' + mut for e in [col_obs, 'EXP']]
@@ -166,8 +171,9 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
         df_kept['LOGFC_' + mut + '_' + bur] = np.log2(df_kept[cols_lfc[0]] / df_kept[cols_lfc[1]] + 1)
         df_kept['FDR_' + mut + '_' + bur] = fdrcorrection(df_kept[col_pval])[1]
         df_kept['FDR_' + mut + '_' + bur + '_recalc'] = fdrcorrection(df_kept[col_pval + '_recalc'])[1]
-        df_kept['FDR_' + mut + '_' + bur + '_lower'] = fdrcorrection(df_kept[col_pval + '_lower'])[1]
-        df_kept['FDR_' + mut + '_' + bur + '_upper'] = fdrcorrection(df_kept[col_pval + '_upper'])[1]
+        if display_bounds:
+            df_kept['FDR_' + mut + '_' + bur + '_lower'] = fdrcorrection(df_kept[col_pval + '_lower'])[1]
+            df_kept['FDR_' + mut + '_' + bur + '_upper'] = fdrcorrection(df_kept[col_pval + '_upper'])[1]
         df_kept['dNdS_OBS'] = df_kept[col_obs + '_NONSYN'] / df_kept['OBS_SYN']
         df_kept['dNdS_EXP'] = df_kept['EXP_NONSYN'] / df_kept['EXP_SYN']
         df_kept = df_kept.sort_values(by='PVAL_' + mut + '_' + bur, ignore_index=True)
@@ -177,9 +183,15 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
         logfc = df_kept['LOGFC_' + mut + '_' + bur].to_numpy()
         pvals = df_kept['PVAL_' + mut + '_' + bur + '_recalc'].to_numpy()
         qvals = df_kept['FDR_' + mut + '_' + bur + '_recalc'].to_numpy()
-        pval_bounds = df_kept[['PVAL_' + mut + '_' + bur + '_lower', 'PVAL_' + mut + '_' + bur + '_upper']].to_numpy()
+        if display_bounds:
+            pval_bounds = df_kept[['PVAL_' + mut + '_' + bur + '_lower', 'PVAL_' + mut + '_' + bur + '_upper']].to_numpy()
+        else:
+            pval_bounds = None
         logq = -np.log10(qvals)
-        logq_bounds = -np.log10(df_kept[['FDR_' + mut + '_' + bur + '_lower', 'FDR_' + mut + '_' + bur + '_upper']].to_numpy())
+        if display_bounds:
+            logq_bounds = -np.log10(df_kept[['FDR_' + mut + '_' + bur + '_lower', 'FDR_' + mut + '_' + bur + '_upper']].to_numpy())
+        else:
+            logq_bounds = None
 
         # Determine significant points
         ind_sig = qvals < alp
@@ -262,7 +274,7 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
         return df_kept, pvals, pval_bounds, logfc, logq, logq_bounds, labels, ind_kept, table_fig
 
     # generate the data and table for the default values
-    df_kept, pvals, pval_bounds, logfc, logq, logq_bounds, labels, ind_kept, table_fig = generate_plot_data('MIS', 'BURDEN_SAMPLE')
+    df_kept, pvals, pval_bounds, logfc, logq, logq_bounds, labels, ind_kept, table_fig = generate_plot_data('MIS', 'BURDEN_SAMPLE', True)
 
     # Update the HTML template to include the additional text below the table
     html_content = """
@@ -299,6 +311,49 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
             .figure-column {{
                 width: 33%;
             }}
+            .switch {{
+            position: relative;
+            display: inline-block;
+            width: 30px;
+            height: 17px;
+            }}
+            .switch input {{
+                opacity: 0;
+                width: 0;
+                height: 0;
+            }}
+            .slider {{
+                position: absolute;
+                cursor: pointer;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background-color: #ccc;
+                transition: .4s;
+            }}
+            .slider:before {{
+                position: absolute;
+                content: "";
+                height: 13px;
+                width: 13px;
+                left: 2px;
+                bottom: 2px;
+                background-color: white;
+                transition: .4s;
+            }}
+            input:checked + .slider {{
+                background-color: #000000;
+            }}
+            input:checked + .slider:before {{
+                transform: translateX(13px);
+            }}
+            .slider.round {{
+                border-radius: 17px;
+            }}
+            .slider.round:before {{
+                border-radius: 50%;
+            }}
         </style>
     </head>
     <body>
@@ -313,6 +368,12 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
         <select id="burden-type" onchange="updatePlot()">
             {burden_options}
         </select>
+        
+        <label for="display-bounds-type">Display bounds?</label>
+        <label class="switch">
+            <input type="checkbox" id="display-bounds-type" onchange="updatePlot()">
+            <span class="slider round"></span>
+        </label>
     
         <h2 id="plot-title"></h2>
     
@@ -333,8 +394,9 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
             function updatePlot() {{
                 var mutTypeKey = document.getElementById("mut-type").value;
                 var burdenTypeKey = document.getElementById("burden-type").value;
+                var displayBoundsKey = document.getElementById("display-bounds-type").checked ? 'Yes' : 'No';
     
-                var data = plotData[mutTypeKey + '_' + burdenTypeKey];
+                var data = plotData[mutTypeKey + '_' + burdenTypeKey + '_' + displayBoundsKey];
     
                 // Update Volcano Plot
                 var volcanoData = data.volcano;
@@ -367,51 +429,28 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
     # generate the dropdown options
     mut_options = "\n".join([f'<option value="{key}">{key}</option>' for key in mut_type.keys()])
     burden_options = "\n".join([f'<option value="{key}">{key}</option>' for key in burden_type.keys()])
+    display_bounds_options = "\n".join([f'<option value="{key}">{key}</option>' for key in display_bounds_type.keys()])
 
     # prepare plot data for all combinations of mut_type and burden_type dropdown options
     plot_data = {}
     for mut_key, mut_val in mut_type.items():
         for bur_key, bur_val in burden_type.items():
-            if not (mut_key == 'Indel' and bur_key == 'Sample-wise'):
-                df_kept, pvals, pval_bounds, logfc, logq, logq_bounds, labels, ind_kept, table_fig = generate_plot_data(mut_val, bur_val)
+            for display_bounds_key, display_bounds_val in display_bounds_type.items():
+                if not (mut_key == 'Indel' and bur_key == 'Sample-wise'):
+                    df_kept, pvals, pval_bounds, logfc, logq, logq_bounds, labels, ind_kept, table_fig = generate_plot_data(mut_val, bur_val, display_bounds_val)
 
-                # Volcano Plot
+                    # Volcano Plot
 
-                # Scatter plots
-                logq_upper = logq_bounds[:, 0] - logq
-                logq_lower = logq - logq_bounds[:, 1]
-                ind_capped = logq > ymax
-                volcano_fig = go.Figure()
-                volcano_fig.add_trace(
-                    go.Scatter(
-                        x=logfc[~ind_kept].tolist(),
-                        y=logq[~ind_kept].tolist(),
-                        error_y=dict(
-                            type='data',
-                            symmetric=False,
-                            array=np.round(logq_upper[~ind_kept], 3).tolist(),
-                            arrayminus=np.round(logq_lower[~ind_kept], 3).tolist(),
-                            thickness=thk_err,
-                            width=wid_err,
-                            color=col_err_nonsig
-                        ),
-                        mode='markers',
-                        marker=dict(color=col_nonsig, opacity=opac_nonsig),
-                        text=labels[~ind_kept].tolist(),
-                        name='Non-significant',
-                        showlegend=False,
-                        xhoverformat='.3f',
-                        yhoverformat='.3f'
-                    )
-                )
-
-                ind_ncapped = np.logical_and(ind_kept, ~ind_capped)
-
-                volcano_fig.add_trace(
-                    go.Scatter(
-                        x=logfc[ind_ncapped].tolist(),
-                        y=logq[ind_ncapped].tolist(),
-                        error_y=dict(
+                    # Scatter plots
+                    ind_capped = logq > ymax
+                    ind_ncapped = np.logical_and(ind_kept, ~ind_capped)
+                    labels_capped = labels[ind_capped].tolist()
+                    logfc_capped = logfc[ind_capped].tolist()
+                    logq_capped = logq[ind_capped].tolist()
+                    if display_bounds_val:
+                        logq_upper = logq_bounds[:, 0] - logq
+                        logq_lower = logq - logq_bounds[:, 1]
+                        dict_erry_sig = dict(
                             type='data',
                             symmetric=False,
                             array=np.round(logq_upper[ind_ncapped], 3).tolist(),
@@ -419,121 +458,130 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                             thickness=thk_err,
                             width=wid_err,
                             color=col_err_sig
-                        ),
-                        mode='markers',
-                        marker=dict(color=col_sig, opacity=opac_sig),
-                        text=labels[ind_ncapped].tolist(),
-                        name='Significant',
-                        showlegend=False,
-                        xhoverformat='.3f',
-                        yhoverformat='.3f'
-                    )
-                )
+                        )
+                        dict_erry_nonsig = dict(
+                            type='data',
+                            symmetric=False,
+                            array=np.round(logq_upper[~ind_kept], 3).tolist(),
+                            arrayminus=np.round(logq_lower[~ind_kept], 3).tolist(),
+                            thickness=thk_err,
+                            width=wid_err,
+                            color=col_err_nonsig
+                        )
+                        logq_upper_capped = logq_upper[ind_capped].tolist()
+                        logq_lower_capped = logq_lower[ind_capped].tolist()
+                        labels_capped = [(
+                            f"({logfc_capped[i]:.3f}, {logq_capped[i]:.3f} +{logq_upper_capped[i]:.3f} / -{logq_lower_capped[i]:.3f})<br>{l}")
+                            for i, l in enumerate(labels_capped)]
+                        ylim_upper = min(np.max(logq_upper + logq), ymax) * (1 + hor_buffer)
+                    else:
+                        dict_erry_sig, dict_erry_nonsig = None, None
+                        labels_capped = [(
+                            f"({logfc_capped[i]:.3f}, {logq_capped[i]:.3f})<br>{l}")
+                            for i, l in enumerate(labels_capped)]
+                        ylim_upper = min(np.max(logq), ymax) * (1 + hor_buffer)
 
-                labels_capped = labels[ind_capped].tolist()
-                logfc_capped = logfc[ind_capped].tolist()
-                logq_capped = logq[ind_capped].tolist()
-                logq_upper_capped = logq_upper[ind_capped].tolist()
-                logq_lower_capped = logq_lower[ind_capped].tolist()
-                labels_capped = [(f"({logfc_capped[i]:.3f}, {logq_capped[i]:.3f} +{logq_upper_capped[i]:.3f} / -{logq_lower_capped[i]:.3f})<br>{l}") for i, l in enumerate(labels_capped)]
-
-                volcano_fig.add_trace(
-                    go.Scatter(
-                        x=logfc[ind_capped].tolist(),
-                        y=[ymax] * sum(ind_capped),
-                        mode='markers',
-                        marker=dict(color=col_sig, opacity=opac_sig),
-                        text=labels_capped,
-                        name='Significant',
-                        showlegend=False,
-                        hoverinfo='name+text',
-                    )
-                )
-
-                # Line plots
-                ylim_upper = min(np.max(logq_upper + logq), ymax) * (1 + hor_buffer)
-                volcano_fig.add_trace(
-                    go.Scatter(
-                        x=[1, 1],
-                        y=[0, ylim_upper],
-                        mode='lines',
-                        line=dict(dash=typ_thin, color=col_thin, width=thk_thin),
-                        showlegend=False,
-                        hoverinfo='skip'
-                    )
-                )
-                volcano_fig.add_trace(
-                    go.Scatter(
-                        x=[0, np.max(logfc) * (1 + hor_buffer)],
-                        y=[-np.log10(alp), -np.log10(alp)],
-                        mode='lines',
-                        line=dict(dash=typ_thick, color=col_thick, width=thk_thick),
-                        showlegend=False,
-                        hoverinfo='skip'
-                    )
-                )
-                if ylim_upper > ymax:
+                    volcano_fig = go.Figure()
                     volcano_fig.add_trace(
                         go.Scatter(
-                            x=[0, np.max(logfc) * (1 + hor_buffer)],
-                            y=[ymax] * 2,
+                            x=logfc[~ind_kept].tolist(),
+                            y=logq[~ind_kept].tolist(),
+                            error_y=dict_erry_nonsig,
+                            mode='markers',
+                            marker=dict(color=col_nonsig, opacity=opac_nonsig),
+                            text=labels[~ind_kept].tolist(),
+                            name='Non-significant',
+                            showlegend=False,
+                            xhoverformat='.3f',
+                            yhoverformat='.3f'
+                        )
+                    )
+
+                    volcano_fig.add_trace(
+                        go.Scatter(
+                            x=logfc[ind_ncapped].tolist(),
+                            y=logq[ind_ncapped].tolist(),
+                            error_y=dict_erry_sig,
+                            mode='markers',
+                            marker=dict(color=col_sig, opacity=opac_sig),
+                            text=labels[ind_ncapped].tolist(),
+                            name='Significant',
+                            showlegend=False,
+                            xhoverformat='.3f',
+                            yhoverformat='.3f'
+                        )
+                    )
+
+                    volcano_fig.add_trace(
+                        go.Scatter(
+                            x=logfc[ind_capped].tolist(),
+                            y=[ymax] * sum(ind_capped),
+                            mode='markers',
+                            marker=dict(color=col_sig, opacity=opac_sig),
+                            text=labels_capped,
+                            name='Significant',
+                            showlegend=False,
+                            hoverinfo='name+text',
+                        )
+                    )
+
+                    # Line plots
+                    volcano_fig.add_trace(
+                        go.Scatter(
+                            x=[1, 1],
+                            y=[0, ylim_upper],
                             mode='lines',
                             line=dict(dash=typ_thin, color=col_thin, width=thk_thin),
                             showlegend=False,
                             hoverinfo='skip'
                         )
                     )
-
-                # Figure formatting
-                volcano_fig.update_layout(
-                    title='Observed/Expected counts vs. False Discovery Rate:',
-                    xaxis_title='Log2(Observed/Expected + 1)',
-                    yaxis_title='-Log10(FDR)',
-                    xaxis=dict(range=[0, np.max(logfc) * (1 + hor_buffer)]),
-                    yaxis=dict(range=[0, ylim_upper]),
-                    template='plotly_white'
-                )
-
-                # Q-Q Plot
-
-                # Scatter plots
-                x = -np.log10(np.arange(1, len(pvals) + 1) / (len(pvals) + 1))
-                y = -np.log10(pvals)
-                y_upper = -np.log10(pval_bounds[:, 0]) - y
-                y_lower = y + np.log10(pval_bounds[:, 1])
-                ind_capped = y > ymax
-
-                qq_fig = go.Figure()
-                qq_fig.add_trace(
-                    go.Scatter(
-                        x=x[~ind_kept].tolist(),
-                        y=y[~ind_kept].tolist(),
-                        error_y=dict(
-                            type='data',
-                            symmetric=False,
-                            array=np.round(y_upper[~ind_kept], 3).tolist(),
-                            arrayminus=np.round(y_lower[~ind_kept], 3).tolist(),
-                            thickness=thk_err,
-                            width=wid_err,
-                            color=col_err_nonsig
-                        ),
-                        mode='markers',
-                        marker=dict(color=col_nonsig, opacity=opac_nonsig),
-                        text=labels[~ind_kept].tolist(),
-                        name='Non-significant',
-                        showlegend=False,
-                        xhoverformat='.3f',
-                        yhoverformat='.3f'
+                    volcano_fig.add_trace(
+                        go.Scatter(
+                            x=[0, np.max(logfc) * (1 + hor_buffer)],
+                            y=[-np.log10(alp), -np.log10(alp)],
+                            mode='lines',
+                            line=dict(dash=typ_thick, color=col_thick, width=thk_thick),
+                            showlegend=False,
+                            hoverinfo='skip'
+                        )
                     )
-                )
+                    if ylim_upper > ymax:
+                        volcano_fig.add_trace(
+                            go.Scatter(
+                                x=[0, np.max(logfc) * (1 + hor_buffer)],
+                                y=[ymax] * 2,
+                                mode='lines',
+                                line=dict(dash=typ_thin, color=col_thin, width=thk_thin),
+                                showlegend=False,
+                                hoverinfo='skip'
+                            )
+                        )
 
-                ind_ncapped = np.logical_and(ind_kept, ~ind_capped)
+                    # Figure formatting
+                    volcano_fig.update_layout(
+                        title='Observed/Expected counts vs. False Discovery Rate:',
+                        xaxis_title='Log2(Observed/Expected + 1)',
+                        yaxis_title='-Log10(FDR)',
+                        xaxis=dict(range=[0, np.max(logfc) * (1 + hor_buffer)]),
+                        yaxis=dict(range=[0, ylim_upper]),
+                        template='plotly_white'
+                    )
 
-                qq_fig.add_trace(
-                    go.Scatter(
-                        x=x[ind_ncapped].tolist(),
-                        y=y[ind_ncapped].tolist(),
-                        error_y=dict(
+                    # Q-Q Plot
+
+                    # Scatter plots
+                    x = -np.log10(np.arange(1, len(pvals) + 1) / (len(pvals) + 1))
+                    y = -np.log10(pvals)
+                    ind_capped = y > ymax
+                    ind_ncapped = np.logical_and(ind_kept, ~ind_capped)
+                    labels_capped = labels[ind_capped].tolist()
+                    x_capped = x[ind_capped].tolist()
+                    y_capped = y[ind_capped].tolist()
+                    if display_bounds_val:
+                        y_upper = -np.log10(pval_bounds[:, 0]) - y
+                        y_lower = y + np.log10(pval_bounds[:, 1])
+                        dict_erry_sig = dict(
                             type='data',
                             symmetric=False,
                             array=np.round(y_upper[ind_ncapped], 3).tolist(),
@@ -541,133 +589,168 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                             thickness=thk_err,
                             width=wid_err,
                             color=col_err_sig
-                        ),
-                        mode='markers',
-                        marker=dict(color=col_sig, opacity=opac_sig),
-                        text=labels[ind_ncapped].tolist(),
-                        name='Significant',
-                        showlegend=False,
-                        xhoverformat='.3f',
-                        yhoverformat='.3f'
-                    )
-                )
+                        )
+                        dict_erry_nonsig = dict(
+                            type='data',
+                            symmetric=False,
+                            array=np.round(y_upper[~ind_kept], 3).tolist(),
+                            arrayminus=np.round(y_lower[~ind_kept], 3).tolist(),
+                            thickness=thk_err,
+                            width=wid_err,
+                            color=col_err_nonsig
+                        )
+                        y_upper_capped = y_upper[ind_capped].tolist()
+                        y_lower_capped = y_lower[ind_capped].tolist()
+                        labels_capped = [(
+                                             f"({x_capped[i]:.3f}, {y_capped[i]:.3f} +{y_upper_capped[i]:.3f} / -{y_lower_capped[i]:.3f})<br>{l}")
+                                         for i, l in enumerate(labels_capped)]
+                        ylim_upper = min(np.max(y_upper + y), ymax) * (1 + hor_buffer)
+                    else:
+                        dict_erry_sig, dict_erry_nonsig = None, None
+                        labels_capped = [(
+                            f"({x_capped[i]:.3f}, {y_capped[i]:.3f})<br>{l}")
+                            for i, l in enumerate(labels_capped)]
+                        ylim_upper = min(np.max(y), ymax) * (1 + hor_buffer)
 
-                labels_capped = labels[ind_capped].tolist()
-                x_capped = x[ind_capped].tolist()
-                y_capped = y[ind_capped].tolist()
-                y_upper_capped = y_upper[ind_capped].tolist()
-                y_lower_capped = y_lower[ind_capped].tolist()
-                labels_capped = [(f"({x_capped[i]:.3f}, {y_capped[i]:.3f} +{y_upper_capped[i]:.3f} / -{y_lower_capped[i]:.3f})<br>{l}") for i, l in enumerate(labels_capped)]
-
-                qq_fig.add_trace(
-                    go.Scatter(
-                        x=x_capped,
-                        y=[ymax] * sum(ind_capped),
-                        mode='markers',
-                        marker=dict(color=col_sig, opacity=opac_sig),
-                        text=labels_capped,
-                        name='Significant',
-                        showlegend=False,
-                        hoverinfo='name+text',
+                    qq_fig = go.Figure()
+                    qq_fig.add_trace(
+                        go.Scatter(
+                            x=x[~ind_kept].tolist(),
+                            y=y[~ind_kept].tolist(),
+                            error_y=dict_erry_nonsig,
+                            mode='markers',
+                            marker=dict(color=col_nonsig, opacity=opac_nonsig),
+                            text=labels[~ind_kept].tolist(),
+                            name='Non-significant',
+                            showlegend=False,
+                            xhoverformat='.3f',
+                            yhoverformat='.3f'
+                        )
                     )
-                )
 
-                # Line plots
-                ylim_upper = min(np.max(y_upper + y), ymax) * (1 + hor_buffer)
-                qq_fig.add_trace(
-                    go.Scatter(
-                        x=[0, np.max(x) * (1 + hor_buffer)],
-                        y=[0, np.max(x) * (1 + hor_buffer)],
-                        mode='lines',
-                        line=dict(dash=typ_thick, color=col_thick, width=thk_thick),
-                        showlegend=False,
-                        hoverinfo='skip'
+                    qq_fig.add_trace(
+                        go.Scatter(
+                            x=x[ind_ncapped].tolist(),
+                            y=y[ind_ncapped].tolist(),
+                            error_y=dict_erry_sig,
+                            mode='markers',
+                            marker=dict(color=col_sig, opacity=opac_sig),
+                            text=labels[ind_ncapped].tolist(),
+                            name='Significant',
+                            showlegend=False,
+                            xhoverformat='.3f',
+                            yhoverformat='.3f'
+                        )
                     )
-                )
-                if ylim_upper > ymax:
+
+                    qq_fig.add_trace(
+                        go.Scatter(
+                            x=x_capped,
+                            y=[ymax] * sum(ind_capped),
+                            mode='markers',
+                            marker=dict(color=col_sig, opacity=opac_sig),
+                            text=labels_capped,
+                            name='Significant',
+                            showlegend=False,
+                            hoverinfo='name+text',
+                        )
+                    )
+
+                    # Line plots
                     qq_fig.add_trace(
                         go.Scatter(
                             x=[0, np.max(x) * (1 + hor_buffer)],
-                            y=[ymax] * 2,
+                            y=[0, np.max(x) * (1 + hor_buffer)],
                             mode='lines',
-                            line=dict(dash=typ_thin, color=col_thin, width=thk_thin),
+                            line=dict(dash=typ_thick, color=col_thick, width=thk_thick),
+                            showlegend=False,
+                            hoverinfo='skip'
+                        )
+                    )
+                    if ylim_upper > ymax:
+                        qq_fig.add_trace(
+                            go.Scatter(
+                                x=[0, np.max(x) * (1 + hor_buffer)],
+                                y=[ymax] * 2,
+                                mode='lines',
+                                line=dict(dash=typ_thin, color=col_thin, width=thk_thin),
+                                showlegend=False,
+                                hoverinfo='skip'
+                            )
+                        )
+
+                    # Figure formatting
+                    qq_fig.update_layout(
+                        title='QQ-Plot of P-values:',
+                        xaxis_title='Expected -Log10(P-value)',
+                        yaxis_title='Observed -Log10(P-value)',
+                        xaxis=dict(range=[0, np.max(x) * (1 + hor_buffer)]),
+                        yaxis=dict(range=[0, ylim_upper]),
+                        template='plotly_white'
+                    )
+
+                    # dNdS Plot
+
+                    # Scatter plots
+                    ind_isna = np.logical_or(df_kept['dNdS_EXP'].isna(), df_kept['dNdS_OBS'].isna())
+                    dnds_obs = df_kept['dNdS_OBS'][~ind_isna].to_numpy()
+                    dnds_exp = df_kept['dNdS_EXP'][~ind_isna].to_numpy()
+                    dnds_labels = df_kept['GENE'][~ind_isna].to_numpy()
+                    xmax = np.max(dnds_exp) * (1 + hor_buffer)
+                    ind_psel = dnds_obs > dnds_exp
+                    dnds_fig = go.Figure()
+                    dnds_fig.add_trace(
+                        go.Scatter(
+                            x=dnds_exp[~ind_psel].tolist(),
+                            y=dnds_obs[~ind_psel].tolist(),
+                            mode='markers',
+                            marker=dict(color=col_nonsig, opacity=opac_nonsig),
+                            text=dnds_labels[~ind_psel].tolist(),
+                            name='Lower than expected',
+                            showlegend=False
+                        )
+                    )
+                    dnds_fig.add_trace(
+                        go.Scatter(
+                            x=dnds_exp[ind_psel].tolist(),
+                            y=dnds_obs[ind_psel].tolist(),
+                            mode='markers',
+                            marker=dict(color=col_sig, opacity=opac_sig),
+                            text=dnds_labels[ind_psel].tolist(),
+                            name='Higher than expected',
+                            showlegend=False
+                        )
+                    )
+
+                    # Line plot
+                    dnds_fig.add_trace(
+                        go.Scatter(
+                            x=[0, xmax],
+                            y=[0, xmax],
+                            mode='lines',
+                            line=dict(dash=typ_thick, color=col_thick, width=thk_thick),
                             showlegend=False,
                             hoverinfo='skip'
                         )
                     )
 
-                # Figure formatting
-                qq_fig.update_layout(
-                    title='QQ-Plot of P-values:',
-                    xaxis_title='Expected -Log10(P-value)',
-                    yaxis_title='Observed -Log10(P-value)',
-                    xaxis=dict(range=[0, np.max(x) * (1 + hor_buffer)]),
-                    yaxis=dict(range=[0, ylim_upper]),
-                    template='plotly_white'
-                )
-
-                # dNdS Plot
-
-                # Scatter plots
-                ind_isna = np.logical_or(df_kept['dNdS_EXP'].isna(), df_kept['dNdS_OBS'].isna())
-                dnds_obs = df_kept['dNdS_OBS'][~ind_isna].to_numpy()
-                dnds_exp = df_kept['dNdS_EXP'][~ind_isna].to_numpy()
-                dnds_labels = df_kept['GENE'][~ind_isna].to_numpy()
-                xmax = np.max(dnds_exp) * (1 + hor_buffer)
-                ind_psel = dnds_obs > dnds_exp
-                dnds_fig = go.Figure()
-                dnds_fig.add_trace(
-                    go.Scatter(
-                        x=dnds_exp[~ind_psel].tolist(),
-                        y=dnds_obs[~ind_psel].tolist(),
-                        mode='markers',
-                        marker=dict(color=col_nonsig, opacity=opac_nonsig),
-                        text=dnds_labels[~ind_psel].tolist(),
-                        name='Lower than expected',
-                        showlegend=False
+                    # Figure formatting
+                    dnds_fig.update_layout(
+                        title='Observed vs Expected dNdS ratios:',
+                        xaxis_title='Expected dNdS',
+                        yaxis_title='Observed dNdS',
+                        xaxis=dict(range=[0, xmax]),
+                        yaxis=dict(range=[0, np.max(dnds_obs) * (1 + hor_buffer)]),
+                        template='plotly_white'
                     )
-                )
-                dnds_fig.add_trace(
-                    go.Scatter(
-                        x=dnds_exp[ind_psel].tolist(),
-                        y=dnds_obs[ind_psel].tolist(),
-                        mode='markers',
-                        marker=dict(color=col_sig, opacity=opac_sig),
-                        text=dnds_labels[ind_psel].tolist(),
-                        name='Higher than expected',
-                        showlegend=False
-                    )
-                )
 
-                # Line plot
-                dnds_fig.add_trace(
-                    go.Scatter(
-                        x=[0, xmax],
-                        y=[0, xmax],
-                        mode='lines',
-                        line=dict(dash=typ_thick, color=col_thick, width=thk_thick),
-                        showlegend=False,
-                        hoverinfo='skip'
-                    )
-                )
-
-                # Figure formatting
-                dnds_fig.update_layout(
-                    title='Observed vs Expected dNdS ratios:',
-                    xaxis_title='Expected dNdS',
-                    yaxis_title='Observed dNdS',
-                    xaxis=dict(range=[0, xmax]),
-                    yaxis=dict(range=[0, np.max(dnds_obs) * (1 + hor_buffer)]),
-                    template='plotly_white'
-                )
-
-                # Save figures as separate data
-                plot_data[f"{mut_key}_{bur_key}"] = {
-                    'volcano': volcano_fig.to_dict(),
-                    'qq': qq_fig.to_dict(),
-                    'dnds': dnds_fig.to_dict(),
-                    'table': table_fig.to_dict()
-                }
+                    # Save figures as separate data
+                    plot_data[f"{mut_key}_{bur_key}_{display_bounds_key}"] = {
+                        'volcano': volcano_fig.to_dict(),
+                        'qq': qq_fig.to_dict(),
+                        'dnds': dnds_fig.to_dict(),
+                        'table': table_fig.to_dict()
+                    }
 
     # convert plot data to JSON-like structure
     plot_data_json = json.dumps(plot_data)
@@ -707,6 +790,7 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
     html_content = html_content.format(
         mut_options=mut_options,
         burden_options=burden_options,
+        display_bounds_options=display_bounds_options,
         plot_data=plot_data_json,
         fig_mu_html=fig_mu_html,
         fig_sigma_html=fig_sigma_html
