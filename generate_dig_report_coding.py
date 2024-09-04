@@ -18,10 +18,10 @@ n_rows_buffer = 0.5
 ymax = 16
 
 # properties of significant points
-col_sig = 'red'
+col_sig = 'rgba(255, 0, 0, 1)'
 opac_sig = 0.7
 # properties of non-significant points
-col_nonsig = 'black'
+col_nonsig = 'rgba(0, 0, 0, 1)'
 opac_nonsig = 0.5
 # properties of thinner lines
 thk_thin = 0.75
@@ -32,11 +32,16 @@ thk_thick = 2.5
 col_thick = 'gray'
 typ_thick = 'dash'
 # properties of error bars
-wid_err = 2
-thk_err = 0.3
+wid_err = 1
+thk_err = 0.5
+opac_err = 0.2
 # properties of the bar plot
 col_bar = 'gray'
 opac_bar = 0.8
+
+# derived parameters
+col_err_sig = ','.join(col_sig.split(',')[:-1]) + ', {})'.format(opac_err)
+col_err_nonsig = ','.join(col_nonsig.split(',')[:-1]) + ', {})'.format(opac_err)
 
 # dictionaries for the two dropdowns
 burden_type = {
@@ -54,9 +59,9 @@ mut_type = {
 }
 
 
+
 def nb_pvalue_greater_midp(k, alpha, p):
-    """ Calculate an UPPER TAIL p-value for a negative binomial distribution
-        with a midp correction
+    """ Calculate an UPPER TAIL p-value for a negative binomial distribution with a midp correction
     """
     return 0.5 * sp.stats.nbinom.pmf(k, alpha, p) + sp.special.betainc(k+1, alpha, 1-p)
 
@@ -76,6 +81,10 @@ def nb_pvalue_upper(k, alpha, p):
     pvals[~ind_0] = sp.special.betainc(k[~ind_0], alpha[~ind_0], 1-p[~ind_0])
     return pvals
 
+def nb_pvalue_uniform_midp(k, alpha, p):
+    """ Calculate the upper tail p-value for negative binomial distribution using uniform approximation and a random draw.
+    """
+    return np.random.uniform(size=k.shape) * sp.stats.nbinom.pmf(k, alpha, p) + sp.special.betainc(k+1, alpha, 1-p)
 
 def reformat_numbers(x, format='{:.3E}'):
     """
@@ -383,7 +392,8 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                             array=np.round(logq_upper[~ind_kept], 3).tolist(),
                             arrayminus=np.round(logq_lower[~ind_kept], 3).tolist(),
                             thickness=thk_err,
-                            width=wid_err
+                            width=wid_err,
+                            color=col_err_nonsig
                         ),
                         mode='markers',
                         marker=dict(color=col_nonsig, opacity=opac_nonsig),
@@ -407,7 +417,8 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                             array=np.round(logq_upper[ind_ncapped], 3).tolist(),
                             arrayminus=np.round(logq_lower[ind_ncapped], 3).tolist(),
                             thickness=thk_err,
-                            width=wid_err
+                            width=wid_err,
+                            color=col_err_sig
                         ),
                         mode='markers',
                         marker=dict(color=col_sig, opacity=opac_sig),
@@ -503,7 +514,8 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                             array=np.round(y_upper[~ind_kept], 3).tolist(),
                             arrayminus=np.round(y_lower[~ind_kept], 3).tolist(),
                             thickness=thk_err,
-                            width=wid_err
+                            width=wid_err,
+                            color=col_err_nonsig
                         ),
                         mode='markers',
                         marker=dict(color=col_nonsig, opacity=opac_nonsig),
@@ -527,7 +539,8 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                             array=np.round(y_upper[ind_ncapped], 3).tolist(),
                             arrayminus=np.round(y_lower[ind_ncapped], 3).tolist(),
                             thickness=thk_err,
-                            width=wid_err
+                            width=wid_err,
+                            color=col_err_sig
                         ),
                         mode='markers',
                         marker=dict(color=col_sig, opacity=opac_sig),
