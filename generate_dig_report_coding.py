@@ -49,13 +49,14 @@ burden_type = {
     'Sample-wise': 'BURDEN_SAMPLE',
 }
 mut_type = {
-    'Indel': 'INDEL',
-    'Nonsynonymous SNV': 'NONSYN',
-    'Missense SNV': 'MIS',
-    'Nonsense SNV': 'NONS',
-    'Truncating SNV': 'TRUNC',
-    'Splice site SNV': 'SPL',
-    'Synonymous SNV': 'SYN',
+    'Indels + Nonsynonymous SNVs': 'NONSYN_INDEL',
+    'Indels': 'INDEL',
+    'Nonsynonymous SNVs': 'NONSYN',
+    'Missense SNVs': 'MIS',
+    'Nonsense SNVs': 'NONS',
+    'Truncating SNVs': 'TRUNC',
+    'Splice site SNVs': 'SPL',
+    'Synonymous SNVs': 'SYN',
 }
 scatterpoint_type = {
     "Uniform P-mid": "unif",
@@ -105,6 +106,11 @@ def reformat_numbers(x, format='{:.3E}'):
 def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp=0.1):
     # Output from DIGDriver
     df = pd.read_csv(path_to_dig_results, sep='\t')
+    # Adding new columns for Non-synonymous SNVs + Indels
+    df['OBS_NONSYN_INDEL'] = df['OBS_NONSYN'] + df['OBS_INDEL']
+    df['EXP_NONSYN_INDEL'] = df['EXP_NONSYN'] + df['EXP_INDEL']
+    df['N_SAMP_NONSYN_INDEL'] = df['N_SAMP_NONSYN'] + df['N_SAMP_INDEL']
+    df['Pi_NONSYN_INDEL'] = df['Pi_NONSYN'] + df['Pi_INDEL']
     # Computing lower and upper bounds for the p-values
     muts_ts = list(mut_type.values())
     muts_ts.remove('INDEL')
@@ -181,16 +187,16 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
         :param display_bounds: bool, whether to display the bounds of the p-values
         :param scatterpoint: str, type of p-values to use
         """
+
+        col_pval = 'PVAL_' + mut + '_' + bur
         col_obs = 'OBS' if (bur == 'BURDEN') else 'N_SAMP'
         cols_lfc = [e + '_' + mut for e in [col_obs, 'EXP']]
-        col_pval = 'PVAL_' + mut + '_' + bur
+        ind_keep = df[cols_lfc[1]] > 0
 
         # subsetting to only those genes for which the expected nuber of mutations is greater than 0
-        ind_keep = df[cols_lfc[1]] > 0
         df_kept = df.loc[ind_keep].copy()
-
         df_kept['LOGFC_' + mut + '_' + bur] = np.log2(df_kept[cols_lfc[0]] / df_kept[cols_lfc[1]] + 1)
-        df_kept['FDR_' + mut + '_' + bur] = fdrcorrection(df_kept[col_pval])[1]
+        # df_kept['FDR_' + mut + '_' + bur] = fdrcorrection(df_kept[col_pval])[1]
         df_kept['FDR_' + mut + '_' + bur + '_' + scatterpoint] = fdrcorrection(df_kept[col_pval + '_' + scatterpoint])[1]
         if display_bounds:
             df_kept['FDR_' + mut + '_' + bur + '_lower'] = fdrcorrection(df_kept[col_pval + '_lower'])[1]
@@ -201,9 +207,9 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
         df_kept['RANK'] = df_kept.index + 1
 
         labels = df_kept.GENE.to_numpy()
-        logfc = df_kept['LOGFC_' + mut + '_' + bur].to_numpy()
         pvals = df_kept['PVAL_' + mut + '_' + bur + '_' + scatterpoint].to_numpy()
         qvals = df_kept['FDR_' + mut + '_' + bur + '_' + scatterpoint].to_numpy()
+        logfc = df_kept['LOGFC_' + mut + '_' + bur].to_numpy()
         if display_bounds:
             pval_bounds = df_kept[['PVAL_' + mut + '_' + bur + '_lower', 'PVAL_' + mut + '_' + bur + '_upper']].to_numpy()
         else:
@@ -442,7 +448,7 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                 Plotly.react('table-plot', tableData);
     
                 // Update Header
-                var headerText = burdenTypeKey + ' Mutation Burden of ' + mutTypeKey + 's';
+                var headerText = burdenTypeKey + ' Mutation Burden of ' + mutTypeKey;
                 document.getElementById("plot-title").textContent = headerText;
             }}
     
@@ -465,7 +471,7 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
         for bur_key, bur_val in burden_type.items():
             for display_bounds_key, display_bounds_val in display_bounds_type.items():
                 for scatterpoint_key, scatterpoint_val in scatterpoint_type.items():
-                    if not (mut_key == 'Indel' and bur_key == 'Sample-wise'):
+                    if not (mut_key == 'Indels' and bur_key == 'Sample-wise'):
                         df_kept, pvals, pval_bounds, logfc, logq, logq_bounds, labels, ind_kept, table_fig = generate_plot_data(mut_val, bur_val, display_bounds_val, scatterpoint_val)
 
                         # Volcano Plot
