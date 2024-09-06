@@ -38,6 +38,8 @@ opac_err = 0.2
 # properties of the bar plot
 col_bar = 'gray'
 opac_bar = 0.8
+# text for the special case when Sample-wise case does not exist
+text_special = 'Sample-wise case does not exist for Indels and Indels + Nonsynonymous SNVs!'
 
 # derived parameters
 col_err_sig = ','.join(col_sig.split(',')[:-1]) + ', {})'.format(opac_err)
@@ -399,6 +401,12 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
             .slider.round:before {{
                 border-radius: 50%;
             }}
+            .red-text {{
+                color: red;
+            }}
+            .black-text {{
+                color: black;
+            }}
         </style>
     </head>
     <body>
@@ -425,7 +433,7 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
             <span class="slider round"></span>
         </label>
     
-        <h2 id="plot-title"></h2>
+        <h2 id="plot-title" class="text-color"></h2>
     
         <div class="container">
             <div id="volcano-plot" class="plot"></div>
@@ -466,8 +474,10 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                 Plotly.react('table-plot', tableData);
     
                 // Update Header
-                var headerText = burdenTypeKey + ' Mutation Burden of ' + mutTypeKey;
+                var headerText = data.text;
                 document.getElementById("plot-title").textContent = headerText;
+                var headerColor = data.textcolor;
+                document.getElementById("plot-title").className = headerColor;
             }}
     
             // Initial plot
@@ -802,7 +812,18 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
                             'volcano': volcano_fig.to_dict(),
                             'qq': qq_fig.to_dict(),
                             'dnds': dnds_fig.to_dict(),
-                            'table': table_fig.to_dict()
+                            'table': table_fig.to_dict(),
+                            'text': bur_key + ' Mutation Burden of ' + mut_key,
+                            'textcolor': 'black-text'
+                        }
+                    else:
+                        plot_data[f"{mut_key}_{bur_key}_{display_bounds_key}_{scatterpoint_key}"] = {
+                            'volcano': None,
+                            'qq': None,
+                            'dnds': None,
+                            'table': None,
+                            'text': text_special,
+                            'textcolor': 'red-text'
                         }
 
     # convert plot data to JSON-like structure
