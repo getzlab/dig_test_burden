@@ -49,7 +49,7 @@ burden_type = {
     'Sample-wise': 'BURDEN_SAMPLE',
 }
 mut_type = {
-    'Indels + Nonsynonymous SNVs': 'NONSYN_INDEL',
+    'Indels + Nonsynonymous SNVs': 'MUT',
     'Indels': 'INDEL',
     'Nonsynonymous SNVs': 'NONSYN',
     'Missense SNVs': 'MIS',
@@ -107,13 +107,12 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
     # Output from DIGDriver
     df = pd.read_csv(path_to_dig_results, sep='\t')
     # Adding new columns for Non-synonymous SNVs + Indels
-    df['OBS_NONSYN_INDEL'] = df['OBS_NONSYN'] + df['OBS_INDEL']
-    df['EXP_NONSYN_INDEL'] = df['EXP_NONSYN'] + df['EXP_INDEL']
-    df['N_SAMP_NONSYN_INDEL'] = df['N_SAMP_NONSYN'] + df['N_SAMP_INDEL']
-    df['Pi_NONSYN_INDEL'] = df['Pi_NONSYN'] + df['Pi_INDEL']
+    df['OBS_MUT'] = df['OBS_NONSYN'] + df['OBS_INDEL']
+    df['EXP_MUT'] = df['EXP_NONSYN'] + df['EXP_INDEL']
     # Computing lower and upper bounds for the p-values
     muts_ts = list(mut_type.values())
     muts_ts.remove('INDEL')
+    muts_ts.remove('MUT')
     for m in muts_ts:
         # total burden
         df['PVAL_' + m + '_BURDEN_recalc'] = nb_pvalue_greater_midp(
@@ -178,6 +177,25 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
         df.ALPHA_INDEL,
         1 / (df.THETA_INDEL * df.Pi_INDEL + 1)
     )
+    # p-values for nonsynonymous SNVs + indels
+    col_mut = 'PVAL_MUT_BURDEN'
+    df[col_mut + '_recalc'] = np.nan
+    df[col_mut + '_unif'] = np.nan
+    df[col_mut + '_lower'] = np.nan
+    df[col_mut + '_upper'] = np.nan
+    for idx in df.index:
+        df.at[idx, col_mut + '_recalc'] = sp.stats.combine_pvalues(
+            [df.at[idx, 'PVAL_NONSYN_BURDEN_recalc'], df.at[idx, 'PVAL_INDEL_BURDEN_recalc']],
+            method='fisher').pvalue
+        df.at[idx, col_mut + '_unif'] = sp.stats.combine_pvalues(
+            [df.at[idx, 'PVAL_NONSYN_BURDEN_unif'], df.at[idx, 'PVAL_INDEL_BURDEN_unif']],
+            method='fisher').pvalue
+        df.at[idx, col_mut + '_lower'] = sp.stats.combine_pvalues(
+            [df.at[idx, 'PVAL_NONSYN_BURDEN_lower'], df.at[idx, 'PVAL_INDEL_BURDEN_lower']],
+            method='fisher').pvalue
+        df.at[idx, col_mut + '_upper'] = sp.stats.combine_pvalues(
+            [df.at[idx, 'PVAL_NONSYN_BURDEN_upper'], df.at[idx, 'PVAL_INDEL_BURDEN_upper']],
+            method='fisher').pvalue
 
     def generate_plot_data(mut, bur, display_bounds, scatterpoint):
         """
@@ -471,7 +489,7 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
         for bur_key, bur_val in burden_type.items():
             for display_bounds_key, display_bounds_val in display_bounds_type.items():
                 for scatterpoint_key, scatterpoint_val in scatterpoint_type.items():
-                    if not (mut_key == 'Indels' and bur_key == 'Sample-wise'):
+                    if not (mut_key in ['Indels', 'Indels + Nonsynonymous SNVs'] and bur_key == 'Sample-wise'):
                         df_kept, pvals, pval_bounds, logfc, logq, logq_bounds, labels, ind_kept, table_fig = generate_plot_data(mut_val, bur_val, display_bounds_val, scatterpoint_val)
 
                         # Volcano Plot

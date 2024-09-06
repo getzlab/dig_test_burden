@@ -49,9 +49,9 @@ burden_type = {
     'Sample-wise': 'SAMPLE_BURDEN',
 }
 mut_type = {
-    'Indels + SNVs': 'SNV_INDEL',
+    'Indels + SNVs': 'MUT',
     'Indels': 'INDEL',
-    'SNVs': 'SNV',
+    'SNVs': 'SNV'
 }
 
 scatterpoint_type = {
@@ -104,36 +104,56 @@ def generate_dig_report(path_to_dig_results, dir_output, name_interval_set, pref
     # Output from DIGDriver
     df = pd.read_csv(path_to_dig_results, sep='\t')
     # Adding new columns for Non-synonymous SNVs + Indels
-    df['OBS_SNV_INDEL'] = df['OBS_SNV'] + df['OBS_INDEL']
-    df['EXP_SNV_INDEL'] = df['EXP_SNV'] + df['EXP_INDEL']
-    df['Pi_SNV_INDEL'] = df['Pi_SUM'] + df['Pi_INDEL']
+    df['OBS_MUT'] = df['OBS_SNV'] + df['OBS_INDEL']
+    df['EXP_MUT'] = df['EXP_SNV'] + df['EXP_INDEL']
     # Computing lower and upper bounds for the p-values
-    pfxs_obs = ['SNV', 'INDEL', 'SAMPLES', 'SNV_INDEL']
-    pfxs_pval = ['SNV', 'INDEL', 'SAMPLE', 'SNV_INDEL']
-    pfxs_pi = ['SUM', 'INDEL', 'SUM', 'SNV_INDEL']
-    pfxs_at = ['', '_INDEL', '', '']
+    pfxs_obs = ['SNV', 'INDEL', 'SAMPLES', 'MUT']
+    pfxs_pval = ['SNV', 'INDEL', 'SAMPLE', 'MUT']
+    pfxs_pi = ['SUM', 'INDEL', 'SUM', 'MUT']
+    pfxs_at = ['', '_INDEL', '', '', '']
 
     for i in range(len(pfxs_obs)):
-        df['PVAL_' + pfxs_pval[i] + '_BURDEN_recalc'] = nb_pvalue_greater_midp(
-            df['OBS_' + pfxs_obs[i]],
-            df['ALPHA' + pfxs_at[i]],
-            1 / (df['THETA' + pfxs_at[i]] * df['Pi_' + pfxs_pi[i]] + 1)
-        )
-        df['PVAL_' + pfxs_pval[i] + '_BURDEN_unif'] = nb_pvalue_uniform_midp(
-            df['OBS_' + pfxs_obs[i]],
-            df['ALPHA' + pfxs_at[i]],
-            1 / (df['THETA' + pfxs_at[i]] * df['Pi_' + pfxs_pi[i]] + 1)
-        )
-        df['PVAL_' + pfxs_pval[i] + '_BURDEN_lower'] = nb_pvalue_lower(
-            df['OBS_' + pfxs_obs[i]],
-            df['ALPHA' + pfxs_at[i]],
-            1 / (df['THETA' + pfxs_at[i]] * df['Pi_' + pfxs_pi[i]] + 1)
-        )
-        df['PVAL_' + pfxs_pval[i] + '_BURDEN_upper'] = nb_pvalue_upper(
-            df['OBS_' + pfxs_obs[i]],
-            df['ALPHA' + pfxs_at[i]],
-            1 / (df['THETA' + pfxs_at[i]] * df['Pi_' + pfxs_pi[i]] + 1)
-        )
+        if pfxs_obs[i] == 'MUT':
+            col_i = 'PVAL_' + pfxs_pval[i] + '_BURDEN'
+            df[col_i + '_recalc'] = np.nan
+            df[col_i + '_unif'] = np.nan
+            df[col_i + '_lower'] = np.nan
+            df[col_i + '_upper'] = np.nan
+            for idx in df.index:
+                df.at[idx, col_i + '_recalc'] = sp.stats.combine_pvalues(
+                    [df.at[idx, 'PVAL_SNV_BURDEN_recalc'], df.at[idx, 'PVAL_INDEL_BURDEN_recalc']],
+                    method='fisher').pvalue
+                df.at[idx, col_i + '_unif'] = sp.stats.combine_pvalues(
+                    [df.at[idx, 'PVAL_SNV_BURDEN_unif'], df.at[idx, 'PVAL_INDEL_BURDEN_unif']],
+                    method='fisher').pvalue
+                df.at[idx, col_i + '_lower'] = sp.stats.combine_pvalues(
+                    [df.at[idx, 'PVAL_SNV_BURDEN_lower'], df.at[idx, 'PVAL_INDEL_BURDEN_lower']],
+                    method='fisher').pvalue
+                df.at[idx, col_i + '_upper'] = sp.stats.combine_pvalues(
+                    [df.at[idx, 'PVAL_SNV_BURDEN_upper'], df.at[idx, 'PVAL_INDEL_BURDEN_upper']],
+                    method='fisher').pvalue
+
+        else:
+            df['PVAL_' + pfxs_pval[i] + '_BURDEN_recalc'] = nb_pvalue_greater_midp(
+                df['OBS_' + pfxs_obs[i]],
+                df['ALPHA' + pfxs_at[i]],
+                1 / (df['THETA' + pfxs_at[i]] * df['Pi_' + pfxs_pi[i]] + 1)
+            )
+            df['PVAL_' + pfxs_pval[i] + '_BURDEN_unif'] = nb_pvalue_uniform_midp(
+                df['OBS_' + pfxs_obs[i]],
+                df['ALPHA' + pfxs_at[i]],
+                1 / (df['THETA' + pfxs_at[i]] * df['Pi_' + pfxs_pi[i]] + 1)
+            )
+            df['PVAL_' + pfxs_pval[i] + '_BURDEN_lower'] = nb_pvalue_lower(
+                df['OBS_' + pfxs_obs[i]],
+                df['ALPHA' + pfxs_at[i]],
+                1 / (df['THETA' + pfxs_at[i]] * df['Pi_' + pfxs_pi[i]] + 1)
+            )
+            df['PVAL_' + pfxs_pval[i] + '_BURDEN_upper'] = nb_pvalue_upper(
+                df['OBS_' + pfxs_obs[i]],
+                df['ALPHA' + pfxs_at[i]],
+                1 / (df['THETA' + pfxs_at[i]] * df['Pi_' + pfxs_pi[i]] + 1)
+            )
 
     def generate_plot_data(mut, bur, display_bounds, scatterpoint):
         """
@@ -419,7 +439,7 @@ def generate_dig_report(path_to_dig_results, dir_output, name_interval_set, pref
         for bur_key, bur_val in burden_type.items():
             for display_bounds_key, display_bounds_val in display_bounds_type.items():
                 for scatterpoint_key, scatterpoint_val in scatterpoint_type.items():
-                    if not (mut_key in ['Indels', 'Indels + SNVs'] and bur_key == 'Sample-wise'):
+                    if not (mut_key in ['Indels', 'Indels + SNVs', 'Mutations'] and bur_key == 'Sample-wise'):
                         _, pvals, pval_bounds, logfc, logq, logq_bounds, labels, ind_kept, table_fig = generate_plot_data(mut_val, bur_val, display_bounds_val, scatterpoint_val)
 
                         # Volcano Plot
