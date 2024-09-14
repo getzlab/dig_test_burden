@@ -124,16 +124,16 @@ def generate_dig_report(path_to_dig_results, dir_output, name_interval_set, pref
             for idx in df.index:
                 df.at[idx, col_i + '_recalc'] = sp.stats.combine_pvalues(
                     [df.at[idx, 'PVAL_SNV_BURDEN_recalc'], df.at[idx, 'PVAL_INDEL_BURDEN_recalc']],
-                    method='fisher').pvalue
+                    method='fisher')[1]
                 df.at[idx, col_i + '_unif'] = sp.stats.combine_pvalues(
                     [df.at[idx, 'PVAL_SNV_BURDEN_unif'], df.at[idx, 'PVAL_INDEL_BURDEN_unif']],
-                    method='fisher').pvalue
+                    method='fisher')[1]
                 df.at[idx, col_i + '_lower'] = sp.stats.combine_pvalues(
                     [df.at[idx, 'PVAL_SNV_BURDEN_lower'], df.at[idx, 'PVAL_INDEL_BURDEN_lower']],
-                    method='fisher').pvalue
+                    method='fisher')[1]
                 df.at[idx, col_i + '_upper'] = sp.stats.combine_pvalues(
                     [df.at[idx, 'PVAL_SNV_BURDEN_upper'], df.at[idx, 'PVAL_INDEL_BURDEN_upper']],
-                    method='fisher').pvalue
+                    method='fisher')[1]
 
         else:
             df['PVAL_' + pfxs_pval[i] + '_BURDEN_recalc'] = nb_pvalue_greater_midp(
@@ -775,7 +775,7 @@ def parse_args():
     """
     Parse command-line arguments.
     """
-    parser = argparse.ArgumentParser(description="Generate DIG report for coding genes.")
+    parser = argparse.ArgumentParser(description="Generate DIG report for noncoding regions.")
     parser.add_argument("path_to_dig_results", type=str, help="Path to the DIG results file.")
     parser.add_argument("dir_output", type=str, help="Output directory.")
     parser.add_argument("name_interval_set", type=str, help="Name of interval set.")
@@ -788,4 +788,4 @@ if __name__ == "__main__":
     # Parse command-line arguments
     args = parse_args()
     # Call the function with parsed arguments
-    generate_dig_report(args.path_to_dig_results, args.dir_output, args.prefix_output, args.alp)
+    generate_dig_report(args.path_to_dig_results, args.dir_output, args.name_interval_set, args.prefix_output, args.alp)

@@ -188,16 +188,16 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
     for idx in df.index:
         df.at[idx, col_mut + '_recalc'] = sp.stats.combine_pvalues(
             [df.at[idx, 'PVAL_NONSYN_BURDEN_recalc'], df.at[idx, 'PVAL_INDEL_BURDEN_recalc']],
-            method='fisher').pvalue
+            method='fisher')[1]
         df.at[idx, col_mut + '_unif'] = sp.stats.combine_pvalues(
             [df.at[idx, 'PVAL_NONSYN_BURDEN_unif'], df.at[idx, 'PVAL_INDEL_BURDEN_unif']],
-            method='fisher').pvalue
+            method='fisher')[1]
         df.at[idx, col_mut + '_lower'] = sp.stats.combine_pvalues(
             [df.at[idx, 'PVAL_NONSYN_BURDEN_lower'], df.at[idx, 'PVAL_INDEL_BURDEN_lower']],
-            method='fisher').pvalue
+            method='fisher')[1]
         df.at[idx, col_mut + '_upper'] = sp.stats.combine_pvalues(
             [df.at[idx, 'PVAL_NONSYN_BURDEN_upper'], df.at[idx, 'PVAL_INDEL_BURDEN_upper']],
-            method='fisher').pvalue
+            method='fisher')[1]
 
     def generate_plot_data(mut, bur, display_bounds, scatterpoint):
         """
@@ -872,7 +872,7 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
     )
 
     # save to an HTML file
-    with open(dir_output + 'DIG_report_coding' + ('' if (prefix_output is None) else '_' + prefix_output) + '.html',
+    with open(dir_output + '/DIG_report_coding' + ('' if (prefix_output is None) else '_' + prefix_output) + '.html',
               'w') as f:
         f.write(html_content)
 
