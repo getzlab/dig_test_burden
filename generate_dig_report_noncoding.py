@@ -754,7 +754,7 @@ def generate_dig_report(path_to_dig_results, dir_output, name_interval_set, pref
 
     # combine everything into the final HTML
     html_content = html_content.format(
-        name_interval_set=name_interval_set.title(),
+        name_interval_set=name_interval_set.replace("_", " ").title(),
         mut_options=mut_options,
         burden_options=burden_options,
         display_bounds_options=display_bounds_options,
