@@ -102,9 +102,19 @@ def reformat_numbers(x, format='{:.3E}'):
     return [format.format(n) for n in x]
 
 
-def generate_dig_report(path_to_dig_results, dir_output, name_interval_set, prefix_output=None, alp=0.1):
+def generate_dig_report(path_to_dig_results, dir_output, cgc_list_path, pancan_list_path, name_interval_set, prefix_output=None, alp=0.1):
+    # Driver gene lists
+    cgc_list = pd.read_csv(cgc_list_path, sep='\t').to_numpy().flatten()
+    pancan_list = pd.read_csv(pancan_list_path, sep='\t').to_numpy().flatten()
     # Output from DIGDriver
     df = pd.read_csv(path_to_dig_results, sep='\t')
+    # Extract gene name and Ensembl ID
+    df['GENE'] = df.ELT.str.split('::', expand=True)[2]
+    df['ENSEMBL_ID'] = df.ELT.str.split('::', expand=True)[3]
+    # df = df.iloc[:20]
+    # Adding indicator of genes being part of the CGC or PanCan list
+    df['CGC'] = df['GENE'].isin(cgc_list)
+    df['PANCAN'] = df['GENE'].isin(pancan_list)
     # Adding new columns for Non-synonymous SNVs + Indels
     df['OBS_MUT'] = df['OBS_SNV'] + df['OBS_INDEL']
     df['EXP_MUT'] = df['EXP_SNV'] + df['EXP_INDEL']
@@ -169,10 +179,6 @@ def generate_dig_report(path_to_dig_results, dir_output, name_interval_set, pref
         col_exp = 'EXP_' + mut
         col_pval = 'PVAL_' + (mut + '_' if bur == 'BURDEN' else '') + bur
 
-        # Extract gene name and Ensembl ID
-        df['GENE'] = df.ELT.str.split('::', expand=True)[2]
-        df['ENSEMBL_ID'] = df.ELT.str.split('::', expand=True)[3]
-
         # subsetting to only those genes for which the expected nuber of mutations is greater than 0
         ind_keep = df[col_exp] > 0
         df_kept = df.loc[ind_keep].copy()
@@ -214,7 +220,7 @@ def generate_dig_report(path_to_dig_results, dir_output, name_interval_set, pref
             col_obs,
             col_exp,
             'MU', 'SIGMA',
-            'FLAG']
+            'FLAG', 'CGC', 'PANCAN']
         n_rows = max(n_rows_min, int(np.sum(ind_sig) * (1 + n_rows_buffer)))
         df_plot = df_kept.iloc[:n_rows][cols_kept].copy()
         df_plot.rename(columns={
@@ -232,8 +238,8 @@ def generate_dig_report(path_to_dig_results, dir_output, name_interval_set, pref
         for col in ['EXP']:
             df_plot[col] = reformat_numbers(df_plot[col].to_numpy(), format='{:.3f}')
 
-        df_plot['FLAG'] = df_plot['FLAG'].astype(str).str.upper()
-        is_flagged = df_plot.FLAG == 'TRUE'
+        is_flagged = df_plot['FLAG'].astype(str).str.title() == 'True'
+        df_plot['FLAG'] = is_flagged
         df_plot.loc[is_flagged, 'GENE'] = df_plot['GENE'][is_flagged] + '*'
 
         # Generate table figure
@@ -246,19 +252,34 @@ def generate_dig_report(path_to_dig_results, dir_output, name_interval_set, pref
         for i in range(df_plot.shape[0]):
             if ind_kept[i]:
                 df_plot.loc[i, :] = '<b>' + df_plot.loc[i, :].astype(str) + '</b>'
+        # Adding hyperlinks to a Google search for the gene names
+        gene_entries = []
+        for g in df_plot['GENE']:
+            if '<b>' in g:
+                g_trimmed = g.split('>')[1].split('<')[0]
+            else:
+                g_trimmed = g
+            gene_entries.append(
+                f'<a href="https://www.google.com/search?q={g_trimmed}+gene+cancer" target="_blank">{g}</a>')
+        # df_plot['GENE'] = gene_entries
+        # df_plot = df_plot[['RANK', 'GENE', 'OBS']]
 
         table_fig = go.Figure(data=[go.Table(
             header=dict(values=['<b><i>' + col + '</i></b>' if col in cols_specific else '<b>' + col + '</b>' for col in
                                 df_plot.columns],
                         line_color='darkslategray',
                         fill_color=headerColor,
-                        align=['left', 'center'],
-                        font=dict(color='white', size=12)),
+                        align=['left'] + ['center'] * (len(df_plot.columns)-1),
+                        font=dict(color='white', size=12)
+                        ),
             cells=dict(values=[df_plot[col].tolist() for col in df_plot.columns],
                        line_color='darkslategray',
                        fill_color=[[rowOddColor if i % 2 == 0 else rowEvenColor for i in range(df_plot.shape[0])]],
-                       align=['left', 'center'],
-                       font=dict(color='darkslategray', size=11)))
+                       align=['left'] + ['center'] * (len(df_plot.columns)-1),
+                       font=dict(color='darkslategray', size=11),
+                       format = ['html'] * len(df_plot.columns)  # Enable HTML formatting
+                       )
+        )
         ])
         table_fig.update_layout(
             annotations=[
@@ -365,7 +386,7 @@ def generate_dig_report(path_to_dig_results, dir_output, name_interval_set, pref
         </style>
     </head>
     <body>
-        <h1>DIG Driver Results for {name_interval_set}</h1>
+        <h1>Mutation Burden Test for {name_interval_set}</h1>
 
         <label for="mut-type">Select Mutation Type:</label>
         <select id="mut-type" onchange="updatePlot()">
@@ -778,6 +799,8 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Generate DIG report for noncoding regions.")
     parser.add_argument("path_to_dig_results", type=str, help="Path to the DIG results file.")
     parser.add_argument("dir_output", type=str, help="Output directory.")
+    parser.add_argument("cgc_list", type=str, help="Path to the list of CGC genes.")
+    parser.add_argument("pancan_list", type=str, help="Path to the list of PanCanAtlas genes.")
     parser.add_argument("name_interval_set", type=str, help="Name of interval set.")
     parser.add_argument("--prefix_output", type=str, default=None, help="Prefix for the output file.")
     parser.add_argument("--alp", type=float, default=0.1, help="Significance level (default: 0.1).")
@@ -788,4 +811,4 @@ if __name__ == "__main__":
     # Parse command-line arguments
     args = parse_args()
     # Call the function with parsed arguments
-    generate_dig_report(args.path_to_dig_results, args.dir_output, args.name_interval_set, args.prefix_output, args.alp)
+    generate_dig_report(args.path_to_dig_results, args.dir_output, args.cgc_list, args.pancan_list, args.name_interval_set, args.prefix_output, args.alp)

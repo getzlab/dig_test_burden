@@ -12,7 +12,7 @@ def generate_main_report(coding_report_path, utr3_report_path, utr5_report_path,
         promoters_content = file.read()
 
     # Template for main_report.html
-    main_report_template = """
+    main_report_template = f"""
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -20,62 +20,62 @@ def generate_main_report(coding_report_path, utr3_report_path, utr5_report_path,
         <meta name="viewport" content="width=device-width">
         <title>DIG Driver Report</title>
         <style>
-            .report-section {
+            .report-section {{
                 display: none;
-            }
-            .active {
+            }}
+            .active {{
                 display: block;
-            }
-            .navbar {
+            }}
+            .navbar {{
                 overflow: hidden;
                 background-color: #333;
-            }
-            .navbar a {
+            }}
+            .navbar a {{
                 float: left;
                 display: block;
                 color: #f2f2f2;
                 text-align: center;
                 padding: 14px 16px;
                 text-decoration: none;
-            }
-            .navbar a:hover {
+            }}
+            .navbar a:hover {{
                 background-color: #ddd;
                 color: black;
-            }
-            .navbar a.active-link {
+            }}
+            .navbar a.active-link {{
                 background-color: white;
                 color: black;
-            }
-            iframe {
+            }}
+            iframe {{
                 width: 100%;
                 height: 1000px;
                 border: none;
-            }
+            }}
         </style>
     </head>
     <body>
         <div class="navbar">
-            <a href="#" onclick="showReport('coding', 'DIG_report_coding.html')">Coding regions</a>
-            <a href="#" onclick="showReport('3-prime-utrs', 'DIG_report_3-prime_utrs.html')">3-prime UTRs</a>
-            <a href="#" onclick="showReport('5-prime-utrs', 'DIG_report_5-prime_utrs.html')">5-prime UTRs</a>
-            <a href="#" onclick="showReport('promoters', 'DIG_report_promoters.html')">Promoter regions</a>
+            <a href="#" onclick="showReport('coding', '{coding_report_path}')">Coding regions</a>
+            <a href="#" onclick="showReport('3-prime-utrs', '{utr3_report_path}')">3-prime UTRs</a>
+            <a href="#" onclick="showReport('5-prime-utrs', '{utr5_report_path}')">5-prime UTRs</a>
+            <a href="#" onclick="showReport('promoters', '{promoter_report_path}')">Promoter regions</a>
         </div>
 
         <div id="coding" class="report-section active">
-            <iframe id="report-frame" src="DIG_report_coding.html"></iframe>
+            <iframe id="report-frame" src="{coding_report_path}"></iframe>
         </div>
 
         <script>
-            function showReport(reportId, reportUrl) {
+            function showReport(reportId, reportUrl) {{
                 var iframe = document.getElementById('report-frame');
                 iframe.src = reportUrl;
 
                 var links = document.querySelectorAll('.navbar a');
                 links.forEach(link => link.classList.remove('active-link'));
 
-                var activeLink = document.querySelector(`.navbar a[onclick*="${reportId}"]`);
+                var activeLink = document.querySelector(`.navbar a[onclick*="{{reportId}}"]`);
                 activeLink.classList.add('active-link');
-            }
+            }}
         </script>
     </body>
     </html>

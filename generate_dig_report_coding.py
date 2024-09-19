@@ -893,7 +893,7 @@ def generate_dig_report(path_to_dig_results, dir_output, cgc_list_path, pancan_l
     )
 
     # save to an HTML file
-    with open(dir_output + '/DIG_report_coding' + ('' if (prefix_output is None) else '_' + prefix_output) + '.html',
+    with open(dir_output + '/DIG_report_coding_regions' + ('' if (prefix_output is None) else '_' + prefix_output) + '.html',
               'w') as f:
         f.write(html_content)
 
