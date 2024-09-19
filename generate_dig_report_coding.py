@@ -105,9 +105,16 @@ def reformat_numbers(x, format='{:.3E}'):
     return [format.format(n) for n in x]
 
 
-def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp=0.1):
+def generate_dig_report(path_to_dig_results, dir_output, cgc_list_path, pancan_list_path, prefix_output=None, alp=0.1):
+    # Driver gene lists
+    cgc_list = pd.read_csv(cgc_list_path, sep='\t').to_numpy().flatten()
+    pancan_list = pd.read_csv(pancan_list_path, sep='\t').to_numpy().flatten()
     # Output from DIGDriver
     df = pd.read_csv(path_to_dig_results, sep='\t')
+    # df = df.iloc[:20]
+    # Adding indicator of genes being part of the CGC or PanCan list
+    df['CGC'] = df['GENE'].isin(cgc_list)
+    df['PANCAN'] = df['GENE'].isin(pancan_list)
     # Adding new columns for Non-synonymous SNVs + Indels
     df['OBS_MUT'] = df['OBS_NONSYN'] + df['OBS_INDEL']
     df['EXP_MUT'] = df['EXP_NONSYN'] + df['EXP_INDEL']
@@ -252,7 +259,7 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
             'FDR_' + mut + '_' + bur + '_' + scatterpoint,
             col_obs + '_' + mut,
             'EXP_' + mut,
-            'MU', 'SIGMA', 'dNdS_OBS', 'dNdS_EXP', 'FLAG']
+            'MU', 'SIGMA', 'dNdS_OBS', 'dNdS_EXP', 'FLAG', 'CGC', 'PANCAN']
         n_rows = max(n_rows_min, int(np.sum(ind_sig) * (1 + n_rows_buffer)))
         df_plot = df_kept.iloc[:n_rows][cols_kept].copy()
         df_plot.rename(columns={
@@ -274,8 +281,8 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
         is_inf = np.logical_or(np.isinf(df_plot.dNdS_OBS.to_numpy()), np.isnan(df_plot.dNdS_OBS.to_numpy()))
         df_plot['dNdS_OBS'] = df_plot['dNdS_OBS'].astype(str)
         df_plot.loc[is_inf, 'dNdS_OBS'] = 'NA'
-        df_plot['FLAG'] = df_plot['FLAG'].astype(str).str.upper()
-        is_flagged = df_plot.FLAG == 'TRUE'
+        is_flagged = df_plot['FLAG'].astype(str).str.title() == 'True'
+        df_plot['FLAG'] = is_flagged
         df_plot.loc[is_flagged, 'GENE'] = df_plot['GENE'][is_flagged] + '*'
 
         # Generate table figure
@@ -288,24 +295,38 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
         for i in range(df_plot.shape[0]):
             if ind_kept[i]:
                 df_plot.loc[i, :] = '<b>' + df_plot.loc[i, :].astype(str) + '</b>'
+        # Adding hyperlinks to a Google search for the gene names
+        gene_entries = []
+        for g in df_plot['GENE']:
+            if '<b>' in g :
+                g_trimmed = g.split('>')[1].split('<')[0]
+            else:
+                g_trimmed = g
+            gene_entries.append(f'<a href="https://www.google.com/search?q={g_trimmed}+gene+cancer" target="_blank">{g}</a>')
+        # df_plot['GENE'] = gene_entries
+        # df_plot = df_plot[['RANK', 'GENE', 'OBS']]
 
         table_fig = go.Figure(data=[go.Table(
             header=dict(values=['<b><i>' + col + '</i></b>' if col in cols_specific else '<b>' + col + '</b>' for col in
                                 df_plot.columns],
                         line_color='darkslategray',
                         fill_color=headerColor,
-                        align=['left', 'center'],
-                        font=dict(color='white', size=12)),
+                        align=['left'] + ['center'] * (len(df_plot.columns)-1),
+                        font=dict(color='white', size=12)
+                        ),
             cells=dict(values=[df_plot[col].tolist() for col in df_plot.columns],
                        line_color='darkslategray',
                        fill_color=[[rowOddColor if i % 2 == 0 else rowEvenColor for i in range(df_plot.shape[0])]],
-                       align=['left', 'center'],
-                       font=dict(color='darkslategray', size=11)))
+                       align=['left'] + ['center'] * (len(df_plot.columns)-1),
+                       font=dict(color='darkslategray', size=11),
+                       format=['html'] * len(df_plot.columns)  # Enable HTML formatting
+                       )
+        )
         ])
         table_fig.update_layout(
             annotations=[
                 dict(
-                    text="*FLAG=TRUE: At least one kilobase-scale region overlapped by gene is <50% uniquely mappable or in the top 99.99th percentile of mutation rate.",
+                    text="*FLAG=True: At least one kilobase-scale region overlapped by gene is <50% uniquely mappable or in the top 99.99th percentile of mutation rate.",
                     x=0,
                     y=-0.15,
                     xref="paper",
@@ -330,7 +351,7 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>DIG for Coding Genes</title>
+        <title>DIG for Coding Regions</title>
         <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
         <style>
             .container {{
@@ -410,7 +431,7 @@ def generate_dig_report(path_to_dig_results, dir_output, prefix_output=None, alp
         </style>
     </head>
     <body>
-        <h1>DIG Driver Results for Coding Genes</h1>
+        <h1>Mutation Burden Test for Coding Regions</h1>
     
         <label for="mut-type">Select Mutation Type:</label>
         <select id="mut-type" onchange="updatePlot()">
@@ -884,6 +905,8 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Generate DIG report for coding genes.")
     parser.add_argument("path_to_dig_results", type=str, help="Path to the DIG results file.")
     parser.add_argument("dir_output", type=str, help="Output directory.")
+    parser.add_argument("cgc_list", type=str, help="Path to the list of CGC genes.")
+    parser.add_argument("pancan_list", type=str, help="Path to the list of PanCanAtlas genes.")
     parser.add_argument("--prefix_output", type=str, default=None, help="Prefix for the output file.")
     parser.add_argument("--alp", type=float, default=0.1, help="Significance level (default: 0.1).")
     return parser.parse_args()
@@ -893,4 +916,4 @@ if __name__ == "__main__":
     # Parse command-line arguments
     args = parse_args()
     # Call the function with parsed arguments
-    generate_dig_report(args.path_to_dig_results, args.dir_output, args.prefix_output, args.alp)
+    generate_dig_report(args.path_to_dig_results, args.dir_output, args.cgc_list, args.pancan_list, args.prefix_output, args.alp)
