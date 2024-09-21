@@ -56,9 +56,9 @@ def generate_main_report(coding_report_path, utr3_report_path, utr5_report_path,
     <body>
         <div class="navbar">
             <a href="#" onclick="showReport('coding', '{coding_report_path}')">Coding regions</a>
-            <a href="#" onclick="showReport('3-prime-utrs', '{utr3_report_path}')">3-prime UTRs</a>
-            <a href="#" onclick="showReport('5-prime-utrs', '{utr5_report_path}')">5-prime UTRs</a>
             <a href="#" onclick="showReport('promoters', '{promoter_report_path}')">Promoter regions</a>
+            <a href="#" onclick="showReport('5-prime-utrs', '{utr5_report_path}')">5-prime UTRs</a>
+            <a href="#" onclick="showReport('3-prime-utrs', '{utr3_report_path}')">3-prime UTRs</a>
         </div>
 
         <div id="coding" class="report-section active">
@@ -73,7 +73,7 @@ def generate_main_report(coding_report_path, utr3_report_path, utr5_report_path,
                 var links = document.querySelectorAll('.navbar a');
                 links.forEach(link => link.classList.remove('active-link'));
 
-                var activeLink = document.querySelector(`.navbar a[onclick*="{{reportId}}"]`);
+                var activeLink = document.querySelector(`.navbar a[onclick*="${{reportId}}"]`);
                 activeLink.classList.add('active-link');
             }}
         </script>
