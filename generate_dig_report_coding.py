@@ -901,7 +901,7 @@ def parse_args():
     """
     Parse command-line arguments.
     """
-    parser = argparse.ArgumentParser(description="Generate DIG report for coding genes.")
+    parser = argparse.ArgumentParser(description="Generate DIG report for coding regions.")
     parser.add_argument("path_to_dig_results", type=str, help="Path to the DIG results file.")
     parser.add_argument("dir_output", type=str, help="Output directory.")
     parser.add_argument("cgc_list", type=str, help="Path to the list of CGC genes.")

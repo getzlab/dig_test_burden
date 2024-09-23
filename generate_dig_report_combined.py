@@ -1,7 +1,6 @@
 import argparse
 import pandas as pd
 import plotly.graph_objects as go
-import plotly.express as px
 import numpy as np
 import scipy as sp
 from statsmodels.stats.multitest import fdrcorrection
@@ -564,7 +563,7 @@ def generate_dig_report(
                                     hoverinfo='skip'
                                 )
                             )
-                            
+
                         # Confidence intervals for identity line
                         qq_fig.add_trace(
                             go.Scatter(
