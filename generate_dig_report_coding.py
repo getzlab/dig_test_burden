@@ -307,8 +307,7 @@ def generate_dig_report(path_to_dig_results, dir_output, cgc_list_path, pancan_l
         # df_plot = df_plot[['RANK', 'GENE', 'OBS']]
 
         table_fig = go.Figure(data=[go.Table(
-            header=dict(values=['<b><i>' + col + '</i></b>' if col in cols_specific else '<b>' + col + '</b>' for col in
-                                df_plot.columns],
+            header=dict(values=['<b>' + col + '</b>' for col in df_plot.columns],
                         line_color='darkslategray',
                         fill_color=headerColor,
                         align=['left'] + ['center'] * (len(df_plot.columns)-1),
@@ -319,7 +318,7 @@ def generate_dig_report(path_to_dig_results, dir_output, cgc_list_path, pancan_l
                        fill_color=[[rowOddColor if i % 2 == 0 else rowEvenColor for i in range(df_plot.shape[0])]],
                        align=['left'] + ['center'] * (len(df_plot.columns)-1),
                        font=dict(color='darkslategray', size=11),
-                       format=['html'] * len(df_plot.columns)  # Enable HTML formatting
+                       # format=['html'] * len(df_plot.columns)  # Enable HTML formatting
                        )
         )
         ])

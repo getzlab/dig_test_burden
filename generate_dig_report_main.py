@@ -1,17 +1,6 @@
 import argparse
 
-def generate_main_report(coding_report_path, utr3_report_path, utr5_report_path, promoter_report_path, output_path):
-    # Read the content of the four DIG report HTML files
-    with open(coding_report_path, 'r') as file:
-        coding_content = file.read()
-    with open(utr3_report_path, 'r') as file:
-        utr3_content = file.read()
-    with open(utr5_report_path, 'r') as file:
-        utr5_content = file.read()
-    with open(promoter_report_path, 'r') as file:
-        promoters_content = file.read()
-
-    # Template for main_report.html
+def generate_main_report(coding_report_path, utr3_report_path, utr5_report_path, promoter_report_path, combined_report_path, output_path):
     main_report_template = f"""
     <!DOCTYPE html>
     <html lang="en">
@@ -55,6 +44,7 @@ def generate_main_report(coding_report_path, utr3_report_path, utr5_report_path,
     </head>
     <body>
         <div class="navbar">
+            <a href="#" onclick="showReport('combined', '{combined_report_path}')">Combined</a>
             <a href="#" onclick="showReport('coding', '{coding_report_path}')">Coding regions</a>
             <a href="#" onclick="showReport('promoters', '{promoter_report_path}')">Promoter regions</a>
             <a href="#" onclick="showReport('5-prime-utrs', '{utr5_report_path}')">5-prime UTRs</a>
@@ -62,7 +52,7 @@ def generate_main_report(coding_report_path, utr3_report_path, utr5_report_path,
         </div>
 
         <div id="coding" class="report-section active">
-            <iframe id="report-frame" src="{coding_report_path}"></iframe>
+            <iframe id="report-frame" src="{combined_report_path}"></iframe>
         </div>
 
         <script>
@@ -94,6 +84,7 @@ def parse_args():
     parser.add_argument("utr3_report_path", type=str, help="Path to the DIG report HTML file for 3-prime UTRs.")
     parser.add_argument("utr5_report_path", type=str, help="Path to the DIG report HTML file for 5-prime UTRs.")
     parser.add_argument("promoter_report_path", type=str, help="Path to the DIG report HTML file for promoter regions")
+    parser.add_argument("combined_report_path", type=str, help="Path to the DIG report HTML file for all regions.")
     parser.add_argument("output_path", type=str, help="Output path for the main DIG report HTML file.")
     return parser.parse_args()
 
@@ -101,4 +92,4 @@ if __name__ == "__main__":
     # Parse command-line arguments
     args = parse_args()
     # Generate the main report
-    generate_main_report(args.coding_report_path, args.utr3_report_path, args.utr5_report_path, args.promoter_report_path, args.output_path)
+    generate_main_report(args.coding_report_path, args.utr3_report_path, args.utr5_report_path, args.promoter_report_path, args.combined_report_path, args.output_path)
