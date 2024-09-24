@@ -12,20 +12,24 @@ generate_dig_report_noncoding.generate_dig_report(
     './',
     cgc_list_path,
     pancan_list_path,
-    'promoter_regions')
+    'promoter_regions',
+    prefix_output='uvm'
+)
 generate_dig_report_noncoding.generate_dig_report(
     '5utr.results.txt',
     './',
     cgc_list_path,
     pancan_list_path,
-    '5-prime_UTRs'
+    '5-prime_UTRs',
+    prefix_output='uvm'
 )
 generate_dig_report_noncoding.generate_dig_report(
     '3utr.results.txt',
     './',
     cgc_list_path,
     pancan_list_path,
-    '3-prime_UTRs'
+    '3-prime_UTRs',
+    prefix_output='uvm'
 )
 
 # coding regions
@@ -34,25 +38,28 @@ generate_dig_report_coding.generate_dig_report(
     './',
     cgc_list_path,
     pancan_list_path,
+    prefix_output='uvm'
 )
 
 # combined test for all regions
 generate_dig_report_combined.generate_dig_report(
     'genes.results.txt',
     'promoters.results.txt',
-    '5utr.results.txt',
     '3utr.results.txt',
+    '5utr.results.txt',
     './',
     cgc_list_path,
-    pancan_list_path
+    pancan_list_path,
+    prefix_output='uvm'
 )
 
 # main report
 generate_dig_report_main.generate_main_report(
-    'DIG_report_coding_regions.html',
-    'DIG_report_3-prime_utrs.html',
-    'DIG_report_5-prime_utrs.html',
-    'DIG_report_promoter_regions.html',
-    'DIG_report_combined.html',
-    'DIG_report_main.html'
+    'uvm_dig_report_coding_regions.html',
+    'uvm_dig_report_promoter_regions.html',
+    'uvm_dig_report_3-prime_utrs.html',
+    'uvm_dig_report_5-prime_utrs.html',
+    'uvm_dig_report_combined.html',
+    './',
+    prefix_output='uvm'
 )

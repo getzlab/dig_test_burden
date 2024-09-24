@@ -1,6 +1,6 @@
 import argparse
 
-def generate_main_report(coding_report_path, utr3_report_path, utr5_report_path, promoter_report_path, combined_report_path, output_path):
+def generate_main_report(coding_report_path, promoter_report_path, utr3_report_path, utr5_report_path, combined_report_path, dir_output, prefix_output=None):
     main_report_template = f"""
     <!DOCTYPE html>
     <html lang="en">
@@ -72,24 +72,26 @@ def generate_main_report(coding_report_path, utr3_report_path, utr5_report_path,
     """
 
     # Save the generated main_report.html
-    with open(output_path, 'w') as file:
-        file.write(main_report_template)
+    with open(dir_output + '/' + ('' if (prefix_output is None) else prefix_output + '_') + f'dig_report_main.html',
+              'w') as f:
+        f.write(main_report_template)
 
 def parse_args():
     """
     Parse command-line arguments.
     """
-    parser = argparse.ArgumentParser(description="Generate main DIG report.")
+    parser = argparse.ArgumentParser(description="Generate final DIG report.")
     parser.add_argument("coding_report_path", type=str, help="Path to the DIG report HTML file for coding regions.")
+    parser.add_argument("promoter_report_path", type=str, help="Path to the DIG report HTML file for promoter regions")
     parser.add_argument("utr3_report_path", type=str, help="Path to the DIG report HTML file for 3-prime UTRs.")
     parser.add_argument("utr5_report_path", type=str, help="Path to the DIG report HTML file for 5-prime UTRs.")
-    parser.add_argument("promoter_report_path", type=str, help="Path to the DIG report HTML file for promoter regions")
     parser.add_argument("combined_report_path", type=str, help="Path to the DIG report HTML file for all regions.")
-    parser.add_argument("output_path", type=str, help="Output path for the main DIG report HTML file.")
+    parser.add_argument("dir_output", type=str, help="Output directory.")
+    parser.add_argument("--prefix_output", type=str, help="Prefix for the output file name.")
     return parser.parse_args()
 
 if __name__ == "__main__":
     # Parse command-line arguments
     args = parse_args()
     # Generate the main report
-    generate_main_report(args.coding_report_path, args.utr3_report_path, args.utr5_report_path, args.promoter_report_path, args.combined_report_path, args.output_path)
+    generate_main_report(args.coding_report_path, args.promoter_report_path, args.utr3_report_path, args.utr5_report_path, args.combined_report_path, args.dir_output, args.prefix_output)

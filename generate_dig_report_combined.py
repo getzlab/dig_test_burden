@@ -34,7 +34,7 @@ typ_thick = 'dash'
 # properties of error bars
 wid_err = 2
 thk_err = 0.3
-opac_err = 0.2
+opac_err = 0.3
 # properties of the bar plot
 col_bar = 'gray'
 opac_bar = 0.8
@@ -206,9 +206,12 @@ def generate_dig_report(
             df_comb.loc[~isna, 'FDR_' + mt + '_' + typ] = fdrcorrection(df_comb.loc[~isna, 'PVAL_' + mt + '_' + typ])[1]
 
     # adding CGC and PanCanAtlas information
-    df_comb['CGC'] = df_comb.index.isin(cgc_list)
-    df_comb['PANCAN'] = df_comb.index.isin(pancan_list)
-    df_comb = df_comb.reset_index(names=['GENE'])
+    df_comb['CGC'] = df_comb.index.isin(cgc_list).copy()
+    df_comb['PANCAN'] = df_comb.index.isin(pancan_list).copy()
+    df_comb = df_comb.reset_index(names=['GENE']).copy()
+
+    # save combined p-values into a text file
+    df_comb.to_csv(('' if (prefix_output is None) else prefix_output + '.') + 'combined.results.txt', sep='\t', index=False)
 
     def generate_plot_data(mut, bur, display_bounds, scatterpoint):
         """
@@ -625,7 +628,7 @@ def generate_dig_report(
     )
 
     # save to an HTML file
-    with open(dir_output + f'DIG_report_combined' + ('' if (prefix_output is None) else '_' + prefix_output) + '.html',
+    with open(dir_output + '/' + ('' if (prefix_output is None) else prefix_output + '_') + f'dig_report_combined.html',
               'w') as f:
         f.write(html_content)
 

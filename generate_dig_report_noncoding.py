@@ -35,7 +35,7 @@ typ_thick = 'dash'
 # properties of error bars
 wid_err = 2
 thk_err = 0.3
-opac_err = 0.2
+opac_err = 0.3
 # properties of the bar plot
 col_bar = 'gray'
 opac_bar = 0.8
@@ -786,7 +786,7 @@ def generate_dig_report(path_to_dig_results, dir_output, cgc_list_path, pancan_l
 
     # save to an HTML file
     name = '_'.join(name_interval_set.split(' ')).lower()
-    with open(dir_output + f'DIG_report_{name}' + ('' if (prefix_output is None) else '_' + prefix_output) + '.html',
+    with open(dir_output + '/' + ('' if (prefix_output is None) else prefix_output + '_') + f'dig_report_{name}.html',
               'w') as f:
         f.write(html_content)
 
