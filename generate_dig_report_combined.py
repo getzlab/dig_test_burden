@@ -97,7 +97,7 @@ def reformat_numbers(df, cols, form='{:.3E}'):
     """
     Reformat numbers in an array to a specific format
     """
-    return df[cols].map(lambda x: form.format(x) if not pd.isna(x) else 'NA')
+    return df[cols].applymap(lambda x: form.format(x) if not pd.isna(x) else 'NA')
 
 
 def generate_dig_report(
@@ -208,10 +208,10 @@ def generate_dig_report(
     # adding CGC and PanCanAtlas information
     df_comb['CGC'] = df_comb.index.isin(cgc_list).copy()
     df_comb['PANCAN'] = df_comb.index.isin(pancan_list).copy()
-    df_comb = df_comb.reset_index(names=['GENE']).copy()
+    df_comb = df_comb.reset_index().copy()
 
     # save combined p-values into a text file
-    df_comb.to_csv(('' if (prefix_output is None) else prefix_output + '.') + 'combined.results.txt', sep='\t', index=False)
+    df_comb.to_csv(('' if (prefix_output is None) else prefix_output + '.') + 'combined.dig.results.txt', sep='\t', index=False)
 
     def generate_plot_data(mut, bur, display_bounds, scatterpoint):
         """
