@@ -7,11 +7,12 @@ import matplotlib
 from matplotlib.patches import Rectangle
 from matplotlib.patches import Patch
 from matplotlib.gridspec import GridSpec
+from matplotlib.lines import Line2D
 from adjustText import adjust_text
 
 import os
 
-def plot_volcano(pvals, logfc, labels, pval_bounds=None, ymax_vol=None, ymax_qq=None, alp=0.1, logfc_thr=0.5, nlab='sig'):
+def plot_volcano(pvals, logfc, labels, marker_labels=None, pval_bounds=None, ymax_vol=None, ymax_qq=None, alp=0.1, logfc_thr=0.5, logfc_xlabel=None, nlab='sig'):
     """
     Generates a volcano and a Q-Q plot for given p-values, logfold changes and labels.
     
@@ -22,7 +23,9 @@ def plot_volcano(pvals, logfc, labels, pval_bounds=None, ymax_vol=None, ymax_qq=
     logfc : numpy.ndarray
         log2(fold change)
     labels : numpy.ndarray
-        array of str
+        array of str, gene names
+    marker_labels : numpy.ndarray
+        array of str, group names encoded by marker types, number of groups must be less than 7
     pval_bounds : numpy.ndarray
         bound to be displayed around p-values, dimensions: pvals.shape[0] x 2
     ymax_vol : float
@@ -33,6 +36,8 @@ def plot_volcano(pvals, logfc, labels, pval_bounds=None, ymax_vol=None, ymax_qq=
         false-discovery threshold
     logfc_thr : float > 0
         threshold of logfold change
+    logfc_xlabel : str
+        label displayed on the volcano plot's x axis
     nlab: str or int
         if 'sig' the only labels corresponding to significant pvals are plotted
         if int then all labels associated with the nlab smallest pvalues are plotted
@@ -43,11 +48,17 @@ def plot_volcano(pvals, logfc, labels, pval_bounds=None, ymax_vol=None, ymax_qq=
     """
 
     # size of markers in scatter plot
-    s = 5
+    s = 10
+    # width of markers
+    lw = 1
     # significant
     col_sig = [1, 0, 0]
     # non-significant
     col_nsig = [0, 0, 1]
+    # marker color on legend
+    col_legend = [0] * 3
+    # list of markers (at most 6 groups are possible in mutsig)
+    marker_choices = ['s', '+', 'x', 'o', '^', '*']
     
     fig = plt.figure(figsize=(12, 5))
     gs = fig.add_gridspec(1, 2)
@@ -60,6 +71,11 @@ def plot_volcano(pvals, logfc, labels, pval_bounds=None, ymax_vol=None, ymax_qq=
     logq = -np.log10(qvals)
     labels = labels[ind_sorted].copy()
     logfc = logfc[ind_sorted].copy()
+    if marker_labels is not None:
+        marker_labels = marker_labels[ind_sorted].copy()
+        marker_label_choices = np.unique(marker_labels)
+        if marker_label_choices.shape[0] > len(marker_choices):
+            raise ValueError('Too many groups in \"marker_labels\"! Please extend \"marker_choices\"!')
     
     ind_sig = qvals < alp
     ind_lfc = np.abs(logfc) > logfc_thr
@@ -74,7 +90,13 @@ def plot_volcano(pvals, logfc, labels, pval_bounds=None, ymax_vol=None, ymax_qq=
     else:
         ind_capped = logq > ymax_vol
         logq[ind_capped] = ymax_vol
-    ax.scatter(logfc, logq, s=s, c=col, edgecolors=None, alpha=1, zorder=11)
+    
+    if marker_labels is None:
+        ax.scatter(logfc, logq, s=s, c=col, edgecolors=None, alpha=1, zorder=11)
+    else:
+        for i, ml in enumerate(marker_label_choices):
+            ind_marker = marker_labels == ml
+            ax.scatter(logfc[ind_marker], logq[ind_marker], s=s, c=col[ind_marker], edgecolors=None, alpha=1, zorder=11, marker=marker_choices[i], linewidth=lw)
 
     if pval_bounds is not None:
         pval_bounds = pval_bounds[ind_sorted, :].copy()
@@ -94,7 +116,10 @@ def plot_volcano(pvals, logfc, labels, pval_bounds=None, ymax_vol=None, ymax_qq=
     ax.plot([0, 0], ylim, 'gray', zorder=0)
     ax.plot([-logfc_thr] * 2, ylim, linestyle='dashed', color='gray', zorder=0)
     ax.plot([logfc_thr] * 2, ylim, linestyle='dashed', color='gray', zorder=0)
-    ax.set_xlabel(r'$\log_{2}(\mathrm{fold\;change})$')
+    if logfc_xlabel is None:
+        ax.set_xlabel(r'$\log_{2}(\mathrm{fold change})$')
+    else:
+        ax.set_xlabel(logfc_xlabel)
     ax.set_ylabel(r'$-\log_{10}(\mathrm{FDR})$')
     ax.set_xlim(xlim)
     ax.set_ylim([0, ylim[1]])
@@ -118,7 +143,12 @@ def plot_volcano(pvals, logfc, labels, pval_bounds=None, ymax_vol=None, ymax_qq=
         ind_capped = y > ymax_qq
     y_plot = y.copy()
     y_plot[ind_capped] = ymax_qq
-    ax.scatter(x, y_plot, marker='o', c=col, s=s, edgecolors=None, alpha=1, zorder=11)
+    if marker_labels is None:
+        ax.scatter(x, y_plot, marker='o', c=col, s=s, edgecolors=None, alpha=1, zorder=11)
+    else:
+        for i, ml in enumerate(marker_label_choices):
+            ind_marker = marker_labels == ml
+            ax.scatter(x[ind_marker], y_plot[ind_marker], s=s, c=col[ind_marker], edgecolors=None, alpha=1, zorder=11, marker=marker_choices[i], linewidth=lw, label=ml)
     if pval_bounds is not None:
         for i in range(pval_bounds.shape[0]):
             if not ind_capped[i]:
@@ -128,7 +158,14 @@ def plot_volcano(pvals, logfc, labels, pval_bounds=None, ymax_vol=None, ymax_qq=
         ylim = [0, ymax_qq * 1.05]
         ax.plot([0, xlim[1]], [ymax_qq] * 2, linestyle='--', color='gray', zorder=0)
     else:
-        ylim = [0, np.max(y_plot) * 1.05]
+        ylim = [0, np.max(y_plot) * 1.05]    
+    # adding legend
+    if marker_labels is not None:
+        ax.legend()
+        leg = ax.get_legend()
+        for i in range(marker_label_choices.shape[0]):
+            leg.legendHandles[i].set_color(col_legend)
+    
     ax.plot([0, xlim[1]], [0, xlim[1]], 'k--', zorder=1)
     ax.set_xlabel(r'$-\log_{10}(p_\mathrm{expected})$')
     ax.set_ylabel(r'$-\log_{10}(p_\mathrm{observed})$')
