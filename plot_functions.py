@@ -12,7 +12,7 @@ from adjustText import adjust_text
 
 import os
 
-def plot_volcano(pvals, logfc, labels, marker_labels=None, pval_bounds=None, ymax_vol=None, ymax_qq=None, alp=0.1, logfc_thr=0.5, logfc_xlabel=None, nlab='sig'):
+def plot_volcano(pvals, logfc, labels, marker_labels=None, marker_legend_title=None, pval_bounds=None, ymax_vol=None, ymax_qq=None, alp=0.1, logfc_thr=0.5, logfc_xlabel=None, nlab='sig'):
     """
     Generates a volcano and a Q-Q plot for given p-values, logfold changes and labels.
     
@@ -26,6 +26,8 @@ def plot_volcano(pvals, logfc, labels, marker_labels=None, pval_bounds=None, yma
         array of str, gene names
     marker_labels : numpy.ndarray
         array of str, group names encoded by marker types, number of groups must be less than 7
+    marker_legend_title: str
+        title on the legend displaying marker label groups
     pval_bounds : numpy.ndarray
         bound to be displayed around p-values, dimensions: pvals.shape[0] x 2
     ymax_vol : float
@@ -159,13 +161,15 @@ def plot_volcano(pvals, logfc, labels, marker_labels=None, pval_bounds=None, yma
         ax.plot([0, xlim[1]], [ymax_qq] * 2, linestyle='--', color='gray', zorder=0)
     else:
         ylim = [0, np.max(y_plot) * 1.05]    
-    # adding legend
+    # add legend
     if marker_labels is not None:
         ax.legend()
         leg = ax.get_legend()
         for i in range(marker_label_choices.shape[0]):
             leg.legendHandles[i].set_color(col_legend)
-    
+        if marker_legend_title is not None:
+            leg.set_title(marker_legend_title)
+        
     ax.plot([0, xlim[1]], [0, xlim[1]], 'k--', zorder=1)
     ax.set_xlabel(r'$-\log_{10}(p_\mathrm{expected})$')
     ax.set_ylabel(r'$-\log_{10}(p_\mathrm{observed})$')
