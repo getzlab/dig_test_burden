@@ -12,7 +12,7 @@ from adjustText import adjust_text
 
 import os
 
-def plot_volcano(pvals, logfc, labels, marker_labels=None, marker_legend_title=None, pval_bounds=None, ymax_vol=None, ymax_qq=None, alp=0.1, logfc_thr=0.5, logfc_xlabel=None, nlab='sig'):
+def plot_volcano(pvals, logfc, labels, marker_labels=None, marker_legend_title=None, pval_bounds=None, ymax_vol=None, ymax_qq=None, alp=0.1, logfc_thr=0.5, logfc_xlabel=None, nlab='sig', save_path=None, fig_size=None, dpi=None):
     """
     Generates a volcano and a Q-Q plot for given p-values, logfold changes and labels.
     
@@ -43,7 +43,13 @@ def plot_volcano(pvals, logfc, labels, marker_labels=None, marker_legend_title=N
     nlab: str or int
         if 'sig' the only labels corresponding to significant pvals are plotted
         if int then all labels associated with the nlab smallest pvalues are plotted
-    
+    save_path: str
+        path where figure will be saved
+    fig_size: tuple of two int
+        figure size in inches
+    dpi: int
+        dpi of figure
+        
     Returns
     -------
     None
@@ -61,8 +67,13 @@ def plot_volcano(pvals, logfc, labels, marker_labels=None, marker_legend_title=N
     col_legend = [0] * 3
     # list of markers (at most 6 groups are possible in mutsig)
     marker_choices = ['s', '+', 'x', 'o', '^', '*']
+    # figure size
+    if fig_size is None:
+        fsiz = (12, 5)
+    else: 
+        fsiz = fig_size
     
-    fig = plt.figure(figsize=(12, 5))
+    fig = plt.figure(figsize=fsiz)
     gs = fig.add_gridspec(1, 2)
     gs = GridSpec(1, 2, wspace=0.15)
     
@@ -175,5 +186,12 @@ def plot_volcano(pvals, logfc, labels, marker_labels=None, marker_legend_title=N
     ax.set_ylabel(r'$-\log_{10}(p_\mathrm{observed})$')
     ax.set_xlim([0, xlim[1]])
     ax.set_ylim([0, ylim[1]])
+    # save figure
+    if save_path is not None:
+        if dpi is None:
+            dpi_save=300
+        else:
+            dpi_save=dpi
+        fig.savefig(save_path, dpi=dpi_save)
     
     plt.show()
