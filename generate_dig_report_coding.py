@@ -274,7 +274,7 @@ def generate_dig_report(path_to_dig_results, dir_output, cgc_list_path, pancan_l
             df_plot[col] = reformat_numbers(df_plot[col].to_numpy())
         for col in ['MU', 'SIGMA']:
             df_plot[col] = reformat_numbers(df_plot[col].to_numpy(), format='{:.2f}')
-        for col in ['dNdS_EXP', 'EXP']:
+        for col in ['dNdS_OBS', 'dNdS_EXP', 'EXP']:
             df_plot[col] = reformat_numbers(df_plot[col].to_numpy(), format='{:.3f}')
 
         df_plot['OBS'] = df_plot['OBS'].astype(int)
