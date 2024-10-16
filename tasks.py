@@ -103,7 +103,7 @@ class DIG_add_objectives(wolf.Task):
     scratch_disk_name="tracks-with-objectives"
     
     preemptible=False
-    checkpoint=True # need this to keep from purging the scratch disk
+    # checkpoint=True # need this to keep from purging the scratch disk
 
     resources = { 
         "cpus-per-task": 2, 
@@ -388,9 +388,9 @@ class DIG_results(wolf.Task):
     }
 
     script="""
-    # Read the first three lines from the .txt files
-    noncoding_html_paths=$(head -n 3 ${noncoding_htmls})
-    noncoding_result_paths=$(head -n 3 ${noncoding_results})
+    # Read all lines from .txt files
+    noncoding_html_paths=$(cat ${noncoding_htmls})
+    noncoding_result_paths=$(cat ${noncoding_results})
     
     # Convert the file paths into arrays
     noncoding_html_arr=($noncoding_html_paths)

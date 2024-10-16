@@ -5,33 +5,47 @@ import re
 import os
 
 def dig_workflow(
-    zipped_tracks = "gs://getzlab-workflows-reference_files-oa/hg38/dig/roadmap_tracks_735_10kb.h5",
-    genome_counts="gs://getzlab-workflows-reference_files-oa/hg38/dig/genome_counts.h5",
-    gene_data="https://cb.csail.mit.edu/DIG/downloads/dig_data_files/gene_data.h5",
-    element_data="gs://getzlab-workflows-reference_files-oa/hg38/dig/element_data.h5",
-    ref_fasta="gs://getzlab-workflows-reference_files-oa/hg38/dig/hg19.fasta",
-    ref_fasta_idx = "gs://getzlab-workflows-reference_files-oa/hg38/dig/hg19.fasta.fai",
-    liftover_chain_file="gs://getzlab-workflows-reference_files-oa/hg38/dig/hg38ToHg19.over.chain.gz",
-    cgc_list="gs://getzlab-workflows-reference_files-oa/hg38/dig/cancer_gene_census_2024_06_20.tsv",
-    pancan_list="gs://getzlab-workflows-reference_files-oa/hg38/dig/pancanatlas_genes.tsv",
+    zipped_tracks = "gs://getzlab-workflows-reference_files-oa/hg19/dig/roadmap_tracks_735_10kb.h5",  # epigenetic tracks
+    genome_counts="gs://getzlab-workflows-reference_files-oa/hg19/dig/genome_counts.h5",
+    gene_data="gs://getzlab-workflows-reference_files-oa/hg19/dig/gene_data.h5",
+    element_data="gs://getzlab-workflows-reference_files-oa/hg19/dig/element_data.h5",
+    ref_fasta="gs://getzlab-workflows-reference_files-oa/hg19/dig/hg19.fasta",
+    ref_fasta_idx = "gs://getzlab-workflows-reference_files-oa/hg19/dig/hg19.fasta.fai",
+    liftover_chain_file="gs://getzlab-workflows-reference_files-oa/hg19/dig/hg38ToHg19.over.chain.gz",  # chainfile for liftover (DIG uses hg19 reference)
+    cgc_list="gs://getzlab-workflows-reference_files-oa/hg19/dig/cancer_gene_census_2024_06_20.tsv",
+    pancan_list="gs://getzlab-workflows-reference_files-oa/hg19/dig/pancanatlas_genes.tsv",
+    genewise_interval_set_name=[
+        "promoters",
+        "3-prime_UTRs",
+        "5-prime_UTRs"
+    ],  # interval sets must remain these, in this order
+    genewise_interval_set_bed=[
+        "gs://getzlab-workflows-reference_files-oa/hg19/dig/gc19_pc.prom.bed",
+        "gs://getzlab-workflows-reference_files-oa/hg19/dig/gc19_pc.3utr.bed",
+        "gs://getzlab-workflows-reference_files-oa/hg19/dig/gc19_pc.5utr.bed"
+    ],  # must be consistent with list above, must be hg19
     maf_file = None,
-    ref_build = None,
-    interval_set_bed=None,
-    interval_set_name=None,
-    mutation_map=None,
-    extra_kfold_args={},            
+    ref_build = None,  # reference genome of maf file (must be "hg19", or "hg38")
+    additional_interval_set_name=None,  # list of names for additional interval sets to be tested 
+    additional_interval_set_bed=None,  # list of bed file paths to additional interval sets aligned to hg19 (consistent with the above list)
+    mutation_map=None,  # if
+    extra_kfold_args={},
+    preemptible=True  # if False that makes the time-intensive tasks run on non-preemptible nodes
 ):
-    # The workflow will train a mutation map for each MAF file passed
-    
+        
     # Identify cohort name based on MAF file name
     try:
-        # TODO make this to accept lists for maf_file:
         cohort_name = re.search(r"(.*?)\.(?:txt|bed|tsv|maf)$", os.path.basename(maf_file)).groups()[0].replace("_", "-").lower()
     except:
         raise ValueError("MAF file expected to be in DIG format with ext [.txt|.bed|.tsv|.maf]!")
-
+    
+    # Only hg19 and hg38 work
     if ref_build not in ['hg19', 'hg38']:
         raise ValueError("ref build must be specified as hg19 or hg38")
+
+    # Collect all analyzed interval sets
+    interval_set_name = genewise_interval_set_name + ([] if additional_interval_set_name==None else additional_interval_set_name)
+    interval_set_bed = genewise_interval_set_bed + ([] if additional_interval_set_bed==None else additional_interval_set_bed)
     
     # Localize hg19 fasta used by DIG
     fasta_localization = LocalizeToDisk(
@@ -96,13 +110,13 @@ def dig_workflow(
             dependencies=[unzip_task, annot_task]
         )
     
-        # # Delete scratch disk with unzipped tracks
-        # delete_tracks = DeleteDisk(
-        #     inputs={
-        #         "disk": unzip_task["tracks"], 
-        #         "upstream": [add_obj_task["muts_added"]]
-        #     }
-        # )
+        # Delete scratch disk with unzipped tracks
+        delete_tracks = DeleteDisk(
+            inputs={
+                "disk": unzip_task["tracks"], 
+                "upstream": [add_obj_task["muts_added"]]
+            }
+        )
     
         # Run k-fold cross validation
         run_kfold_task = DIG_run_kfold(
@@ -139,6 +153,7 @@ def dig_workflow(
                 "gene_data": gene_data
             }
         )
+        # Final mutation map
         mutation_map = pretrain_genic_task["pretrained_model"]
 
     # Build background model from interval sets and mutation map
@@ -208,7 +223,7 @@ def dig_workflow(
         )
     )
 
-    # Generate combined p-values and final report then zip all results and reports into a single file
+    # Generate combined p-values and final report for genewise interval sets then zip all results and reports into a single file
     results = DIG_results(
         inputs = {
             "noncoding_htmls": gather_noncoding_reports['output'],
