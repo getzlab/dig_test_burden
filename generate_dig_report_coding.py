@@ -115,11 +115,16 @@ def generate_dig_report(path_to_dig_results, dir_output, cgc_list_path, pancan_l
     # Adding indicator of genes being part of the CGC or PanCan list
     df['CGC'] = df['GENE'].isin(cgc_list)
     df['PANCAN'] = df['GENE'].isin(pancan_list)
-    # Adding new columns for Non-synonymous SNVs + Indels
-    df['OBS_MUT'] = df['OBS_NONSYN'] + df['OBS_INDEL']
-    df['EXP_MUT'] = df['EXP_NONSYN'] + df['EXP_INDEL']
-    # Computing lower and upper bounds for the p-values
     muts_ts = list(mut_type.values())
+    if 'EXP_INDEL' in df.columns:
+        # Adding new columns for Non-synonymous SNVs + Indels
+        df['OBS_MUT'] = df['OBS_NONSYN'] + df['OBS_INDEL']
+        df['EXP_MUT'] = df['EXP_NONSYN'] + df['EXP_INDEL']
+    else:
+        for key in list(mut_type.keys()):
+            if 'indel' in key.lower():
+                del mut_type[key]
+    # Computing lower and upper bounds for the p-values
     muts_ts.remove('INDEL')
     muts_ts.remove('MUT')
     for m in muts_ts:
@@ -165,46 +170,47 @@ def generate_dig_report(path_to_dig_results, dir_output, cgc_list_path, pancan_l
             df.ALPHA,
             1 / (df.THETA * df['Pi_' + m] + 1)
         )
-    # total indel burden
-    df['PVAL_INDEL_BURDEN_recalc'] = nb_pvalue_greater_midp(
-        df.OBS_INDEL,
-        df.ALPHA_INDEL,
-        1 / (df.THETA_INDEL * df.Pi_INDEL + 1)
-    )
-    df['PVAL_INDEL_BURDEN_unif'] = nb_pvalue_uniform_midp(
-        df.OBS_INDEL,
-        df.ALPHA_INDEL,
-        1 / (df.THETA_INDEL * df.Pi_INDEL + 1)
-    )
-    df['PVAL_INDEL_BURDEN_lower'] = nb_pvalue_lower(
-        df.OBS_INDEL,
-        df.ALPHA_INDEL,
-        1 / (df.THETA_INDEL * df.Pi_INDEL + 1)
-    )
-    df['PVAL_INDEL_BURDEN_upper'] = nb_pvalue_upper(
-        df.OBS_INDEL,
-        df.ALPHA_INDEL,
-        1 / (df.THETA_INDEL * df.Pi_INDEL + 1)
-    )
-    # p-values for nonsynonymous SNVs + indels
-    col_mut = 'PVAL_MUT_BURDEN'
-    df[col_mut + '_recalc'] = np.nan
-    df[col_mut + '_unif'] = np.nan
-    df[col_mut + '_lower'] = np.nan
-    df[col_mut + '_upper'] = np.nan
-    for idx in df.index:
-        df.at[idx, col_mut + '_recalc'] = sp.stats.combine_pvalues(
-            [df.at[idx, 'PVAL_NONSYN_BURDEN_recalc'], df.at[idx, 'PVAL_INDEL_BURDEN_recalc']],
-            method='fisher')[1]
-        df.at[idx, col_mut + '_unif'] = sp.stats.combine_pvalues(
-            [df.at[idx, 'PVAL_NONSYN_BURDEN_unif'], df.at[idx, 'PVAL_INDEL_BURDEN_unif']],
-            method='fisher')[1]
-        df.at[idx, col_mut + '_lower'] = sp.stats.combine_pvalues(
-            [df.at[idx, 'PVAL_NONSYN_BURDEN_lower'], df.at[idx, 'PVAL_INDEL_BURDEN_lower']],
-            method='fisher')[1]
-        df.at[idx, col_mut + '_upper'] = sp.stats.combine_pvalues(
-            [df.at[idx, 'PVAL_NONSYN_BURDEN_upper'], df.at[idx, 'PVAL_INDEL_BURDEN_upper']],
-            method='fisher')[1]
+    if 'EXP_INDEL' in df.columns:
+        # total indel burden
+        df['PVAL_INDEL_BURDEN_recalc'] = nb_pvalue_greater_midp(
+            df.OBS_INDEL,
+            df.ALPHA_INDEL,
+            1 / (df.THETA_INDEL * df.Pi_INDEL + 1)
+        )
+        df['PVAL_INDEL_BURDEN_unif'] = nb_pvalue_uniform_midp(
+            df.OBS_INDEL,
+            df.ALPHA_INDEL,
+            1 / (df.THETA_INDEL * df.Pi_INDEL + 1)
+        )
+        df['PVAL_INDEL_BURDEN_lower'] = nb_pvalue_lower(
+            df.OBS_INDEL,
+            df.ALPHA_INDEL,
+            1 / (df.THETA_INDEL * df.Pi_INDEL + 1)
+        )
+        df['PVAL_INDEL_BURDEN_upper'] = nb_pvalue_upper(
+            df.OBS_INDEL,
+            df.ALPHA_INDEL,
+            1 / (df.THETA_INDEL * df.Pi_INDEL + 1)
+        )
+        # p-values for nonsynonymous SNVs + indels
+        col_mut = 'PVAL_MUT_BURDEN'
+        df[col_mut + '_recalc'] = np.nan
+        df[col_mut + '_unif'] = np.nan
+        df[col_mut + '_lower'] = np.nan
+        df[col_mut + '_upper'] = np.nan
+        for idx in df.index:
+            df.at[idx, col_mut + '_recalc'] = sp.stats.combine_pvalues(
+                [df.at[idx, 'PVAL_NONSYN_BURDEN_recalc'], df.at[idx, 'PVAL_INDEL_BURDEN_recalc']],
+                method='fisher')[1]
+            df.at[idx, col_mut + '_unif'] = sp.stats.combine_pvalues(
+                [df.at[idx, 'PVAL_NONSYN_BURDEN_unif'], df.at[idx, 'PVAL_INDEL_BURDEN_unif']],
+                method='fisher')[1]
+            df.at[idx, col_mut + '_lower'] = sp.stats.combine_pvalues(
+                [df.at[idx, 'PVAL_NONSYN_BURDEN_lower'], df.at[idx, 'PVAL_INDEL_BURDEN_lower']],
+                method='fisher')[1]
+            df.at[idx, col_mut + '_upper'] = sp.stats.combine_pvalues(
+                [df.at[idx, 'PVAL_NONSYN_BURDEN_upper'], df.at[idx, 'PVAL_INDEL_BURDEN_upper']],
+                method='fisher')[1]
 
     def generate_plot_data(mut, bur, display_bounds, scatterpoint):
         """

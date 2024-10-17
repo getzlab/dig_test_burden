@@ -3,8 +3,8 @@ import generate_dig_report_coding
 import generate_dig_report_noncoding
 import generate_dig_report_combined
 
-cgc_list_path = 'gs://getzlab-workflows-reference_files-oa/hg38/dig/cancer_gene_census_2024_06_20.tsv'
-pancan_list_path = 'gs://getzlab-workflows-reference_files-oa/hg38/dig/pancanatlas_genes.tsv'
+cgc_list_path = './cancer_gene_census_2024_06_20.tsv'
+pancan_list_path = './pancanatlas_genes.tsv'
 
 # noncoding regions
 generate_dig_report_noncoding.generate_dig_report(

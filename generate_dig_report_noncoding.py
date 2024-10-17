@@ -115,14 +115,23 @@ def generate_dig_report(path_to_dig_results, dir_output, cgc_list_path, pancan_l
     # Adding indicator of genes being part of the CGC or PanCan list
     df['CGC'] = df['GENE'].isin(cgc_list)
     df['PANCAN'] = df['GENE'].isin(pancan_list)
-    # Adding new columns for Non-synonymous SNVs + Indels
-    df['OBS_MUT'] = df['OBS_SNV'] + df['OBS_INDEL']
-    df['EXP_MUT'] = df['EXP_SNV'] + df['EXP_INDEL']
-    # Computing lower and upper bounds for the p-values
-    pfxs_obs = ['SNV', 'INDEL', 'SAMPLES', 'MUT']
-    pfxs_pval = ['SNV', 'INDEL', 'SAMPLE', 'MUT']
-    pfxs_pi = ['SUM', 'INDEL', 'SUM', 'MUT']
-    pfxs_at = ['', '_INDEL', '', '', '']
+    if 'EXP_INDEL' in df.columns:
+        # Adding new columns for Non-synonymous SNVs + Indels
+        df['OBS_MUT'] = df['OBS_SNV'] + df['OBS_INDEL']
+        df['EXP_MUT'] = df['EXP_SNV'] + df['EXP_INDEL']
+        # Computing lower and upper bounds for the p-values
+        pfxs_obs = ['SNV', 'INDEL', 'SAMPLES', 'MUT']
+        pfxs_pval = ['SNV', 'INDEL', 'SAMPLE', 'MUT']
+        pfxs_pi = ['SUM', 'INDEL', 'SUM', 'MUT']
+        pfxs_at = ['', '_INDEL', '', '', '']
+    else:
+        for key in list(mut_type.keys()):
+            if 'indel' in key.lower():
+                del mut_type[key]
+        pfxs_obs = ['SNV', 'SAMPLES']
+        pfxs_pval = ['SNV', 'SAMPLE']
+        pfxs_pi = ['SUM', 'SUM']
+        pfxs_at = ['', '']
 
     for i in range(len(pfxs_obs)):
         if pfxs_obs[i] == 'MUT':

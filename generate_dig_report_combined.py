@@ -123,7 +123,7 @@ def generate_dig_report(
         '3utr': path_to_3utr_results
     }
     result_types = list(dig_outputs.keys())
-
+    cols_mt_set = set()
     for result_type in result_types:
 
         dfi = pd.read_csv(dig_outputs[result_type], sep='\t')
@@ -131,23 +131,34 @@ def generate_dig_report(
         if result_type == 'coding':
             dfi = dfi.set_index('GENE')
             df_comb = pd.DataFrame(index=dfi.index.copy())
-            col_obs = ['OBS_NONSYN', 'N_SAMP_NONSYN', 'OBS_INDEL']
-            col_pi = ['Pi_NONSYN', 'Pi_NONSYN', 'Pi_INDEL']
+            col_obs = ['OBS_NONSYN', 'N_SAMP_NONSYN']
+            col_pi = ['Pi_NONSYN', 'Pi_NONSYN']
             col_size = 'GENE_LENGTH'
         else:
             dfi['GENE'] = dfi.ELT.str.split('::', expand=True)[2]
             dfi = dfi.sort_values(['GENE', 'OBS_SNV'])
             dfi = dfi.set_index('GENE')
             dfi = dfi.loc[~dfi.index.duplicated()]
-            col_obs = ['OBS_SNV', 'OBS_SAMPLES', 'OBS_INDEL']
-            col_pi = ['Pi_SUM', 'Pi_SUM', 'Pi_INDEL']
+            col_obs = ['OBS_SNV', 'OBS_SAMPLES']
+            col_pi = ['Pi_SUM', 'Pi_SUM']
             col_size = 'ELT_SIZE'
+        cols_mt = ['SNV', 'SNV_SAMPLE']
+        if 'EXP_INDEL' in dfi.columns:
+            col_obs += ['OBS_INDEL']
+            col_pi += ['Pi_INDEL']
+            cols_mt += ['INDEL', 'MUT']
+        else:
+            for key in list(mut_type.keys()):
+                if 'indel' in key.lower():
+                    del mut_type[key]
+
+        cols_mt_set.update(cols_mt)
 
         genes_in_coding = dfi.index[dfi.index.isin(df_comb.index)]
         dfi_comp = dfi.loc[genes_in_coding]
         df_comb.loc[genes_in_coding, 'SIZE_' + result_type] = dfi_comp[col_size].to_numpy().copy()
 
-        for j, mt in enumerate(['SNV', 'SNV_SAMPLE', 'INDEL']):
+        for j, mt in enumerate(cols_mt[:3]):
 
             if mt == 'INDEL':
                 pfx_at = '_INDEL'
@@ -173,29 +184,29 @@ def generate_dig_report(
                 dfi_comp['ALPHA' + pfx_at],
                 1 / (dfi_comp['THETA' + pfx_at] * dfi_comp[col_pi[j]] + 1)
             )
-
-        # combining p-values with Fisher's method
-        col_i = 'PVAL_' + result_type + '_' + 'MUT'
-        df_comb[col_i + '_recalc'] = np.nan
-        df_comb[col_i + '_unif'] = np.nan
-        df_comb[col_i + '_lower'] = np.nan
-        df_comb[col_i + '_upper'] = np.nan
-        for idx in df_comb.index:
-            df_comb.at[idx, col_i + '_recalc'] = sp.stats.combine_pvalues(
-                [df_comb.at[idx, 'PVAL_' + result_type + '_SNV_recalc'],
-                 df_comb.at[idx, 'PVAL_' + result_type + '_INDEL_recalc']], method='fisher')[1]
-            df_comb.at[idx, col_i + '_unif'] = sp.stats.combine_pvalues(
-                [df_comb.at[idx, 'PVAL_' + result_type + '_SNV_unif'],
-                 df_comb.at[idx, 'PVAL_' + result_type + '_INDEL_unif']], method='fisher')[1]
-            df_comb.at[idx, col_i + '_lower'] = sp.stats.combine_pvalues(
-                [df_comb.at[idx, 'PVAL_' + result_type + '_SNV_lower'],
-                 df_comb.at[idx, 'PVAL_' + result_type + '_INDEL_lower']], method='fisher')[1]
-            df_comb.at[idx, col_i + '_upper'] = sp.stats.combine_pvalues(
-                [df_comb.at[idx, 'PVAL_' + result_type + '_SNV_upper'],
-                 df_comb.at[idx, 'PVAL_' + result_type + '_INDEL_upper']], method='fisher')[1]
+        if 'EXP_INDEL' in dfi.columns:
+            # combining p-values with Fisher's method
+            col_i = 'PVAL_' + result_type + '_' + 'MUT'
+            df_comb[col_i + '_recalc'] = np.nan
+            df_comb[col_i + '_unif'] = np.nan
+            df_comb[col_i + '_lower'] = np.nan
+            df_comb[col_i + '_upper'] = np.nan
+            for idx in df_comb.index:
+                df_comb.at[idx, col_i + '_recalc'] = sp.stats.combine_pvalues(
+                    [df_comb.at[idx, 'PVAL_' + result_type + '_SNV_recalc'],
+                     df_comb.at[idx, 'PVAL_' + result_type + '_INDEL_recalc']], method='fisher')[1]
+                df_comb.at[idx, col_i + '_unif'] = sp.stats.combine_pvalues(
+                    [df_comb.at[idx, 'PVAL_' + result_type + '_SNV_unif'],
+                     df_comb.at[idx, 'PVAL_' + result_type + '_INDEL_unif']], method='fisher')[1]
+                df_comb.at[idx, col_i + '_lower'] = sp.stats.combine_pvalues(
+                    [df_comb.at[idx, 'PVAL_' + result_type + '_SNV_lower'],
+                     df_comb.at[idx, 'PVAL_' + result_type + '_INDEL_lower']], method='fisher')[1]
+                df_comb.at[idx, col_i + '_upper'] = sp.stats.combine_pvalues(
+                    [df_comb.at[idx, 'PVAL_' + result_type + '_SNV_upper'],
+                     df_comb.at[idx, 'PVAL_' + result_type + '_INDEL_upper']], method='fisher')[1]
 
     # combining p-values across region types
-    for mt in ['SNV', 'SNV_SAMPLE', 'INDEL', 'MUT']:
+    for mt in list(cols_mt_set):
         for typ in ['recalc', 'unif', 'lower', 'upper']:
             for idx in df_comb.index:
                 df_comb.at[idx, 'PVAL_' + mt + '_' + typ] = sp.stats.combine_pvalues(
